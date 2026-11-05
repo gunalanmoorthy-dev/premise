@@ -20,7 +20,12 @@ import { invoke } from '@forge/bridge';
 
 const App = () => {
   const context = useProductContext();
-  const pageId = context?.extension?.content?.id;
+  // The page ID can sit in different places depending on the Confluence surface.
+  const pageId =
+    context?.extension?.content?.id ||
+    context?.extension?.contentId ||
+    context?.contentId ||
+    null;
 
   const [loading, setLoading] = useState(true); // first load of saved data
   const [working, setWorking] = useState(false); // extract or save in progress
@@ -33,7 +38,10 @@ const App = () => {
   useEffect(() => {
     if (!pageId) return;
     invoke('getSaved', { pageId })
-      .then(setSaved)
+      .then((record) => {
+        // Only treat it as saved if it really holds a list of assumptions.
+        setSaved(record && Array.isArray(record.assumptions) ? record : null);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [pageId]);
@@ -43,9 +51,10 @@ const App = () => {
     setError(null);
     try {
       const result = await invoke('extractAssumptions', { pageId });
-      setDraft(result);
+      const assumptions = Array.isArray(result?.assumptions) ? result.assumptions : [];
+      setDraft({ ...result, assumptions });
       // Tick every suggestion by default; the user unticks wrong ones.
-      setChecked(Object.fromEntries(result.assumptions.map((a) => [a.id, true])));
+      setChecked(Object.fromEntries(assumptions.map((a) => [a.id, true])));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -72,8 +81,22 @@ const App = () => {
     }
   };
 
-  if (!pageId || loading) {
-    return <Spinner label="Loading Premise" />;
+  // Context not ready yet: show a visible loading message.
+  if (!context) {
+    return <Text>Loading Premise...</Text>;
+  }
+
+  // Context loaded but no page ID: show what Forge gave us, so we can fix it.
+  if (!pageId) {
+    return (
+      <SectionMessage appearance="warning" title="Premise could not find the page ID">
+        <Text>{JSON.stringify(context.extension || {}).slice(0, 400)}</Text>
+      </SectionMessage>
+    );
+  }
+
+  if (loading) {
+    return <Text>Loading saved assumptions...</Text>;
   }
 
   return (
@@ -153,8 +176,32 @@ const App = () => {
   );
 };
 
+// Safety net: if anything in the panel crashes, show the error text instead of a blank box.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error) {
+    console.error('Premise panel crashed:', error);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <SectionMessage appearance="error" title="Premise hit an error">
+          <Text>{String(this.state.error?.message || this.state.error)}</Text>
+        </SectionMessage>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 ForgeReconciler.render(
-  <React.StrictMode>
+  <ErrorBoundary>
     <App />
-  </React.StrictMode>
+  </ErrorBoundary>
 );

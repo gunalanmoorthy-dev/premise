@@ -10,7 +10,7 @@ const resolver = new Resolver();
 
 // Preferred Claude model. If Forge does not offer it, pickModel() falls back
 // to an active Sonnet (or any active model) from Forge's own model list.
-const PREFERRED_MODEL = 'claude-sonnet-5';
+const PREFERRED_MODEL = 'claude-haiku-4-5';
 let cachedModel = null;
 
 async function pickModel() {
@@ -20,7 +20,7 @@ async function pickModel() {
     const active = models.filter((m) => m.status === 'active').map((m) => m.model);
     cachedModel =
       active.find((m) => m === PREFERRED_MODEL) ||
-      active.find((m) => m.includes('sonnet')) ||
+      active.find((m) => m.includes('haiku')) ||
       active[0] ||
       PREFERRED_MODEL;
   } catch (e) {
@@ -144,7 +144,9 @@ resolver.define('saveAssumptions', async ({ payload, context }) => {
 
 // 3. Load what was saved before, so the panel shows it straight away.
 resolver.define('getSaved', async ({ payload }) => {
-  return (await kvs.get(storageKey(payload.pageId))) || null;
+  const record = await kvs.get(storageKey(payload.pageId));
+  // Return null unless the record has the shape the panel expects.
+  return record && Array.isArray(record.assumptions) ? record : null;
 });
 
 export const handler = resolver.getDefinitions();
