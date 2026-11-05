@@ -1,4 +1,14 @@
 modules:
+  # Premise byline button: shows on every Confluence page next to the author line.
+  # Clicking it opens a panel that extracts and saves the decision's assumptions.
+  confluence:contentBylineItem:
+    - key: premise-byline
+      resource: main
+      render: native
+      resolver:
+        function: resolver
+      title: Premise
+      tooltip: Check the assumptions behind this decision
   rovo:agent:
     - key: premise-hello-world-agent
       name: premise
@@ -30,9 +40,25 @@ modules:
           required: true
           description: |
             "The message that the user has requested be logged to Forge logs"
+  # Forge LLMs: lets the backend call Claude on Atlassian infrastructure.
+  llm:
+    - key: premise-llm
+      model:
+        - claude
   function:
     - key: messageLogger
       handler: index.messageLogger
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+permissions:
+  scopes:
+    # Read the current page's title and body.
+    - read:page:confluence
+    # Save confirmed assumptions in Forge key-value storage.
+    - storage:app
 app:
   runtime:
     name: nodejs24.x
