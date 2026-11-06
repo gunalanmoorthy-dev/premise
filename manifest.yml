@@ -55,11 +55,18 @@ modules:
     - key: premise-llm
       model:
         - claude
+  # Hourly: re-check every saved tripwire, even when nobody opens the page.
+  scheduledTrigger:
+    - key: premise-hourly-check
+      function: scheduledCheck
+      interval: hour
   function:
     - key: messageLogger
       handler: index.messageLogger
     - key: resolver
       handler: index.handler
+    - key: scheduledCheck
+      handler: index.scheduledCheck
 resources:
   - key: main
     path: src/frontend/index.jsx
@@ -69,6 +76,8 @@ permissions:
     - read:page:confluence
     # Save confirmed assumptions in Forge key-value storage.
     - storage:app
+    # Count Jira issues that match a tripwire's JQL search.
+    - read:jira-work
 app:
   runtime:
     name: nodejs24.x

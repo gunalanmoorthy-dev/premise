@@ -3,7 +3,8 @@
 
 import Resolver from '@forge/resolver';
 import api, { route } from '@forge/api';
-import { kvs } from '@forge/kvs';
+import { kvs, WhereConditions } from '@forge/kvs';
+import { checkRecord } from '../tripwires';
 import { chat, list } from '@forge/llm';
 
 const resolver = new Resolver();
@@ -96,10 +97,18 @@ resolver.define('extractAssumptions', async ({ payload }) => {
     'for example a traffic level, a cost limit, a vendor promise, a deadline or a team size.',
     'Only list assumptions the page states or clearly implies. Do not invent any.',
     'Return 0 to 6 assumptions.',
-    'For each one, suggest how it could be watched in Jira or by date, in one short line.',
+    'For each one, also propose a tripwire that would show the assumption has broken:',
+    '- type "jql": a Jira JQL search plus a threshold. The wire trips when MORE issues than the threshold match.',
+    '  Use only portable JQL: text ~ "keyword", created >= -30d, statusCategory != Done, labels = x.',
+    '  Do not guess project keys or custom issue types. Set the threshold as an early warning,',
+    '  so the wire trips slightly before the real limit is reached.',
+    '- type "date": a YYYY-MM-DD date, when the assumption is tied to a deadline or renewal.',
+    '- type "none": when it cannot be watched from Jira or a date.',
+    'Also give watchHint: one short line, in plain words, explaining what the tripwire watches.',
     '',
     'Reply with JSON only, in exactly this shape:',
-    '{"decision": "one sentence or null", "assumptions": [{"text": "...", "watchHint": "..."}]}',
+    '{"decision": "one sentence or null", "assumptions": [{"text": "...", "watchHint": "...",',
+    ' "tripwire": {"type": "jql", "jql": "...", "threshold": 3} }]}',
     '',
     `Page title: ${page.title}`,
     'Page text:',
@@ -124,22 +133,44 @@ resolver.define('extractAssumptions', async ({ payload }) => {
       id: `a${Date.now()}-${i}`,
       text: String(a.text || '').trim(),
       watchHint: String(a.watchHint || '').trim(),
+      tripwire: normaliseTripwire(a.tripwire),
     })).filter((a) => a.text),
   };
 });
 
-// 2. Save the assumptions the user confirmed for this page.
+// Clean up a tripwire from the model or the panel into one safe shape.
+function normaliseTripwire(t) {
+  if (t?.type === 'jql' && String(t.jql || '').trim()) {
+    return { type: 'jql', jql: String(t.jql).trim(), threshold: Math.max(0, Number(t.threshold) || 0) };
+  }
+  if (t?.type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(String(t.date || ''))) {
+    return { type: 'date', date: String(t.date) };
+  }
+  return { type: 'none' };
+}
+
+// 2. Save the assumptions the user confirmed, then check them straight away.
 resolver.define('saveAssumptions', async ({ payload, context }) => {
   const { pageId, decision, assumptions } = payload;
   const record = {
     pageId,
     decision,
-    assumptions,
+    assumptions: assumptions.map((a) => ({ ...a, tripwire: normaliseTripwire(a.tripwire) })),
     savedBy: context.accountId,
     savedAt: new Date().toISOString(),
   };
-  await kvs.set(storageKey(pageId), record);
-  return record;
+  const checked = await checkRecord(api.asUser(), record);
+  await kvs.set(storageKey(pageId), checked);
+  return checked;
+});
+
+// 2b. "Check now" button: re-run every tripwire on this page as the current user.
+resolver.define('checkNow', async ({ payload }) => {
+  const record = await kvs.get(storageKey(payload.pageId));
+  if (!record || !Array.isArray(record.assumptions)) return null;
+  const checked = await checkRecord(api.asUser(), record);
+  await kvs.set(storageKey(payload.pageId), checked);
+  return checked;
 });
 
 // 3. Load what was saved before, so the panel shows it straight away.
@@ -150,3 +181,24 @@ resolver.define('getSaved', async ({ payload }) => {
 });
 
 export const handler = resolver.getDefinitions();
+
+// Hourly job: re-check every page that has saved assumptions.
+export async function scheduledCheck() {
+  let cursor;
+  let pages = 0;
+  let broken = 0;
+  do {
+    let query = kvs.query().where('key', WhereConditions.beginsWith('premise-page-')).limit(20);
+    if (cursor) query = query.cursor(cursor);
+    const { results, nextCursor } = await query.getMany();
+    for (const { key, value } of results) {
+      if (!value || !Array.isArray(value.assumptions)) continue;
+      const checked = await checkRecord(api.asApp(), value);
+      await kvs.set(key, checked);
+      pages += 1;
+      broken += checked.brokenCount;
+    }
+    cursor = nextCursor;
+  } while (cursor);
+  console.log(`Premise hourly check: ${pages} pages checked, ${broken} broken assumptions`);
+}

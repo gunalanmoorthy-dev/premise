@@ -6,4 +6,4 @@ export function messageLogger(payload) {
 }
 
 // Resolver for the Premise byline panel (frontend calls it with invoke()).
-export { handler } from './resolvers';
+export { handler, scheduledCheck } from './resolvers';
