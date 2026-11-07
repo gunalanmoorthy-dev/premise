@@ -106,25 +106,42 @@ async function createRevisitTicket(requester, record, assumption) {
   }
   if (record.pageUrl) content.push(linkPara('Open the decision page', record.pageUrl));
 
-  const res = await requester.requestJira(route`/rest/api/3/issue`, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fields: {
-        project: { key: record.ticketProjectKey },
-        issuetype: { name: 'Task' },
-        summary: `Revisit decision: ${String(record.pageTitle || record.decision || 'decision').replace(/^decision:\s*/i, '')}`.slice(0, 250),
-        description: { type: 'doc', version: 1, content },
-        labels: [REVISIT_LABEL],
-      },
-    }),
-  });
+  const fields = {
+    project: { key: record.ticketProjectKey },
+    issuetype: { name: 'Task' },
+    summary: `Revisit decision: ${String(record.pageTitle || record.decision || 'decision').replace(/^decision:\s*/i, '')}`.slice(0, 250),
+    description: { type: 'doc', version: 1, content },
+    labels: [REVISIT_LABEL],
+  };
+
+  const post = (body) =>
+    requester.requestJira(route`/rest/api/3/issue`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: body }),
+    });
+
+  // Assign to the person who saved the decision, so Jira notifies them.
+  let assigned = Boolean(record.savedBy);
+  let res = await post(assigned ? { ...fields, assignee: { accountId: record.savedBy } } : fields);
+
+  // If Jira refuses the assignee, still open the ticket, just unassigned.
+  if (!res.ok && assigned && res.status === 400) {
+    console.warn(`Revisit ticket: assignee refused, retrying unassigned (${(await res.text()).slice(0, 150)})`);
+    assigned = false;
+    res = await post(fields);
+  }
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Could not create Jira ticket (HTTP ${res.status}): ${text.slice(0, 200)}`);
   }
   const data = await res.json();
-  return { key: data.key, createdAt: new Date().toISOString() };
+  return {
+    key: data.key,
+    assignee: assigned ? record.savedBy : null,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 // Check every assumption in one page record.

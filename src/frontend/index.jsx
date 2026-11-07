@@ -252,6 +252,7 @@ const App = () => {
                 {a.ticket?.key && (
                   <Text size="small">
                     <Strong>Revisit ticket:</Strong> {a.ticket.key}
+                    {a.ticket.assignee ? ' (assigned to the decision owner)' : ' (unassigned)'}
                   </Text>
                 )}
                 {a.ticketError && <Text size="small">Ticket not created: {a.ticketError}</Text>}
