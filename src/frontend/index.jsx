@@ -20,6 +20,9 @@ import ForgeReconciler, {
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
 
+// Drop a leading "Decision:" or "ADR-001:" style prefix from page titles.
+const cleanTitle = (t = '') => t.replace(/^(decision|adr[-\s]?\d*)\s*:\s*/i, '');
+
 const TRIPWIRE_OPTIONS = [
   { label: 'Jira search', value: 'jql' },
   { label: 'Date', value: 'date' },
@@ -290,7 +293,7 @@ const App = () => {
               </Text>
               {graph.atRisk?.length > 0 && (
                 <SectionMessage appearance="warning" title={`${graph.atRisk.length} linked decision${graph.atRisk.length === 1 ? '' : 's'} at risk`}>
-                  <Text>{graph.atRisk.map((p) => p.title).join(', ')} build on this decision, which has a broken assumption.</Text>
+                  <Text>{`${graph.atRisk.map((p) => `"${cleanTitle(p.title)}"`).join(', ')} ${graph.atRisk.length === 1 ? 'builds' : 'build'} on this decision, which has a broken assumption.`}</Text>
                 </SectionMessage>
               )}
               {[...(graph.owners || []), ...(graph.contributors || [])].length > 0 && (
