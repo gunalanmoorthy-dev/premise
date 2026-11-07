@@ -114,16 +114,21 @@ const App = () => {
     }
   };
 
-  const startDraft = (decision, assumptions, note) => {
+  const startDraft = (decision, assumptions, note, ticketProjectKey) => {
     const list = assumptions.map(withTripwire);
-    setDraft({ decision, assumptions: list, note });
+    setDraft({ decision, assumptions: list, note, ticketProjectKey: ticketProjectKey || '' });
     setChecked(Object.fromEntries(list.map((a) => [a.id, true])));
   };
 
   const extract = () =>
     run(async () => {
       const result = await invoke('extractAssumptions', { pageId });
-      startDraft(result?.decision, Array.isArray(result?.assumptions) ? result.assumptions : [], result?.note);
+      startDraft(
+        result?.decision,
+        Array.isArray(result?.assumptions) ? result.assumptions : [],
+        result?.note,
+        saved?.ticketProjectKey
+      );
     });
 
   const updateTripwire = (id, tripwire) =>
@@ -138,6 +143,7 @@ const App = () => {
         pageId,
         decision: draft.decision,
         assumptions: draft.assumptions.filter((a) => checked[a.id]),
+        ticketProjectKey: draft.ticketProjectKey,
       });
       setSaved(isRecord(record) ? record : null);
       setDraft(null);
@@ -197,6 +203,16 @@ const App = () => {
               </Stack>
             ))
           )}
+          <Stack space="space.075">
+            <Text>
+              <Strong>Revisit tickets:</Strong> when a wire trips, open a Jira ticket in project
+            </Text>
+            <Textfield
+              placeholder="Project key, e.g. KAN (leave empty for no tickets)"
+              value={draft.ticketProjectKey || ''}
+              onChange={(e) => setDraft({ ...draft, ticketProjectKey: e.target.value })}
+            />
+          </Stack>
           <Inline space="space.100">
             <LoadingButton appearance="primary" isLoading={working} onClick={save}>
               Save and check
@@ -233,6 +249,12 @@ const App = () => {
                     {i.key}: {i.summary}
                   </Text>
                 ))}
+                {a.ticket?.key && (
+                  <Text size="small">
+                    <Strong>Revisit ticket:</Strong> {a.ticket.key}
+                  </Text>
+                )}
+                {a.ticketError && <Text size="small">Ticket not created: {a.ticketError}</Text>}
               </Stack>
             );
           })}
@@ -243,7 +265,11 @@ const App = () => {
             <LoadingButton appearance="primary" isLoading={working} onClick={checkNow}>
               Check now
             </LoadingButton>
-            <Button onClick={() => startDraft(saved.decision, saved.assumptions)}>Edit tripwires</Button>
+            <Button
+              onClick={() => startDraft(saved.decision, saved.assumptions, null, saved.ticketProjectKey)}
+            >
+              Edit tripwires
+            </Button>
             <LoadingButton appearance="subtle" isLoading={working} onClick={extract}>
               Extract again
             </LoadingButton>

@@ -6,6 +6,13 @@ import { route } from '@forge/api';
 // How many matching issues to show as evidence when a wire trips.
 const SAMPLE_SIZE = 5;
 
+// Label on Premise's own revisit tickets.
+export const REVISIT_LABEL = 'premise-revisit';
+
+// Never count Premise's own revisit tickets, or a broken wire would feed itself.
+const excludeOwnTickets = (jql) =>
+  `(${jql}) AND (labels is EMPTY OR labels != "${REVISIT_LABEL}")`;
+
 // Count Jira issues matching a JQL query.
 async function countIssues(requester, jql) {
   const res = await requester.requestJira(route`/rest/api/3/search/approximate-count`, {
@@ -41,7 +48,8 @@ export async function checkAssumption(requester, assumption) {
   try {
     if (tripwire.type === 'jql' && tripwire.jql) {
       const threshold = Number(tripwire.threshold ?? 0);
-      const count = await countIssues(requester, tripwire.jql);
+      const jql = excludeOwnTickets(tripwire.jql);
+      const count = await countIssues(requester, jql);
       const broken = count > threshold;
       return {
         ...assumption,
@@ -49,7 +57,7 @@ export async function checkAssumption(requester, assumption) {
         checkedAt,
         evidence: {
           summary: `${count} matching issue${count === 1 ? '' : 's'} (limit ${threshold})`,
-          issues: broken ? await sampleIssues(requester, tripwire.jql) : [],
+          issues: broken ? await sampleIssues(requester, jql) : [],
         },
       };
     }
@@ -79,11 +87,74 @@ export async function checkAssumption(requester, assumption) {
   }
 }
 
+// Small helpers to build Jira's rich-text (ADF) description.
+const para = (text) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+const linkPara = (label, href) => ({
+  type: 'paragraph',
+  content: [{ type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] }],
+});
+
+// Open one "Revisit decision" ticket for an assumption that just broke.
+async function createRevisitTicket(requester, record, assumption) {
+  const content = [
+    para(`The assumption "${assumption.text}" behind this decision no longer holds.`),
+    para(`Decision: ${record.decision || record.pageTitle || 'see linked page'}`),
+    para(`Evidence: ${assumption.evidence?.summary || 'n/a'}`),
+  ];
+  for (const i of assumption.evidence?.issues || []) {
+    content.push(para(`- ${i.key}: ${i.summary}`));
+  }
+  if (record.pageUrl) content.push(linkPara('Open the decision page', record.pageUrl));
+
+  const res = await requester.requestJira(route`/rest/api/3/issue`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        project: { key: record.ticketProjectKey },
+        issuetype: { name: 'Task' },
+        summary: `Revisit decision: ${String(record.pageTitle || record.decision || 'decision').replace(/^decision:\s*/i, '')}`.slice(0, 250),
+        description: { type: 'doc', version: 1, content },
+        labels: [REVISIT_LABEL],
+      },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Could not create Jira ticket (HTTP ${res.status}): ${text.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  return { key: data.key, createdAt: new Date().toISOString() };
+}
+
 // Check every assumption in one page record.
+// When an assumption newly breaks and a ticket project is set, open one revisit ticket.
 export async function checkRecord(requester, record) {
   const assumptions = [];
-  for (const a of record.assumptions || []) {
-    assumptions.push(await checkAssumption(requester, a));
+  for (const before of record.assumptions || []) {
+    const after = await checkAssumption(requester, before);
+
+    if (after.status === 'broken') {
+      const alreadyTicketed = before.status === 'broken' && before.ticket;
+      if (alreadyTicketed) {
+        after.ticket = before.ticket;
+      } else if (record.ticketProjectKey) {
+        try {
+          after.ticket = await createRevisitTicket(requester, record, after);
+          after.ticketError = null;
+        } catch (e) {
+          after.ticket = null;
+          after.ticketError = e.message;
+        }
+      }
+    } else if (after.status === 'holding') {
+      // Recovered: the next break gets a fresh ticket.
+      after.ticket = null;
+      after.ticketError = null;
+    } else {
+      after.ticket = before.ticket || null;
+    }
+    assumptions.push(after);
   }
   const brokenCount = assumptions.filter((a) => a.status === 'broken').length;
   return { ...record, assumptions, brokenCount, lastCheckedAt: new Date().toISOString() };

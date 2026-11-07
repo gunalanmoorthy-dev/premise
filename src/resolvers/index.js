@@ -65,8 +65,11 @@ async function fetchPage(pageId) {
     throw new Error(`Could not read page ${pageId} (HTTP ${res.status})`);
   }
   const page = await res.json();
+  const base = page._links?.base || '';
+  const webui = page._links?.webui || '';
   return {
     title: page.title,
+    url: webui ? `${base}${webui}` : null,
     text: htmlToText(page.body?.storage?.value || ''),
   };
 }
@@ -151,9 +154,13 @@ function normaliseTripwire(t) {
 
 // 2. Save the assumptions the user confirmed, then check them straight away.
 resolver.define('saveAssumptions', async ({ payload, context }) => {
-  const { pageId, decision, assumptions } = payload;
+  const { pageId, decision, assumptions, ticketProjectKey } = payload;
+  const page = await fetchPage(pageId);
   const record = {
     pageId,
+    pageTitle: page.title,
+    pageUrl: page.url,
+    ticketProjectKey: String(ticketProjectKey || '').trim().toUpperCase() || null,
     decision,
     assumptions: assumptions.map((a) => ({ ...a, tripwire: normaliseTripwire(a.tripwire) })),
     savedBy: context.accountId,

@@ -81,6 +81,8 @@ permissions:
     - storage:app
     # Count Jira issues that match a tripwire's JQL search.
     - read:jira-work
+    # Open a "Revisit decision" ticket when an assumption breaks.
+    - write:jira-work
 app:
   runtime:
     name: nodejs24.x
