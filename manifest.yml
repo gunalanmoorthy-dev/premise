@@ -9,8 +9,9 @@ modules:
         function: resolver
       title: Premise
       tooltip: Check the assumptions behind this decision
-      # The new Confluence byline reads its label from this content property.
-      contentPropertyKey: premise-byline-props
+      # Confluence calls this on page load; its title replaces the byline label.
+      dynamicProperties:
+        function: bylineProps
   # Second entry point: page "More actions" menu opens Premise in a dialog.
   confluence:contentAction:
     - key: premise-content-action
@@ -67,6 +68,8 @@ modules:
       handler: index.handler
     - key: scheduledCheck
       handler: index.scheduledCheck
+    - key: bylineProps
+      handler: index.bylineProps
 resources:
   - key: main
     path: src/frontend/index.jsx

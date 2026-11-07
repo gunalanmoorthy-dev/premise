@@ -202,3 +202,36 @@ export async function scheduledCheck() {
   } while (cursor);
   console.log(`Premise hourly check: ${pages} pages checked, ${broken} broken assumptions`);
 }
+
+// Byline label: Confluence calls this when a page loads.
+// Shows "Premise: N broken" so people see trouble without opening the panel.
+export async function bylineProps(event) {
+  const pageId =
+    event?.extension?.content?.id ||
+    event?.context?.extension?.content?.id ||
+    event?.contentId ||
+    event?.context?.contentId;
+
+  if (!pageId) {
+    console.warn(`bylineProps: no page ID in event keys ${Object.keys(event || {}).join(',')}`);
+    return { title: 'Premise', tooltip: 'Check the assumptions behind this decision' };
+  }
+
+  const record = await kvs.get(storageKey(pageId));
+  if (!record || !Array.isArray(record.assumptions) || record.assumptions.length === 0) {
+    return { title: 'Premise', tooltip: 'Check the assumptions behind this decision' };
+  }
+
+  const broken = record.assumptions.filter((a) => a.status === 'broken').length;
+  const total = record.assumptions.length;
+  if (broken > 0) {
+    return {
+      title: `Premise: ${broken} broken`,
+      tooltip: `${broken} of ${total} assumptions behind this decision no longer hold`,
+    };
+  }
+  return {
+    title: `Premise: ${total} holding`,
+    tooltip: `All ${total} assumptions behind this decision still hold`,
+  };
+}
