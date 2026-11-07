@@ -5,6 +5,16 @@ import Resolver from '@forge/resolver';
 import api, { route } from '@forge/api';
 import { kvs, WhereConditions } from '@forge/kvs';
 import { checkRecord } from '../tripwires';
+import { decisionContext, linkedPagesOf } from '../graph';
+import { syncDecisionToGraph } from '../connector';
+
+// Check a record, write the result into the Teamwork Graph, then store it.
+async function checkSyncStore(requester, key, record) {
+  const checked = await checkRecord(requester, record);
+  checked.graphSync = await syncDecisionToGraph(checked);
+  await kvs.set(key, checked);
+  return checked;
+}
 import { chat, list } from '@forge/llm';
 
 const resolver = new Resolver();
@@ -166,9 +176,7 @@ async function saveForPage({ pageId, decision, assumptions, ticketProjectKey, ac
     savedBy: accountId,
     savedAt: new Date().toISOString(),
   };
-  const checked = await checkRecord(api.asUser(), record);
-  await kvs.set(storageKey(pageId), checked);
-  return checked;
+  return checkSyncStore(api.asUser(), storageKey(pageId), record);
 }
 
 resolver.define('saveAssumptions', async ({ payload, context }) =>
@@ -217,7 +225,7 @@ async function discoverPages() {
 }
 
 // 3. Dashboard: tracked decisions plus newly discovered ones.
-resolver.define('listDecisions', async () => {
+resolver.define('listDecisions', async ({ context }) => {
   const records = await allRecords();
   const trackedIds = new Set(records.map((r) => String(r.pageId)));
   const tracked = records
@@ -234,6 +242,20 @@ resolver.define('listDecisions', async () => {
     }))
     .sort((x, y) => y.broken - x.broken);
 
+  // For broken decisions only, ask the graph who and what they affect.
+  const byId = new Map(records.map((r) => [String(r.pageId), r]));
+  for (const d of tracked.filter((t) => t.broken > 0)) {
+    try {
+      const ctx = await contextWithCascade(context.cloudId, d.pageId, byId);
+      d.people = [...new Map([...ctx.owners, ...ctx.contributors].map((u) => [u.accountId, u])).values()];
+      d.linkedPages = ctx.linkedPages;
+      d.dependents = ctx.dependents;
+      d.graphSource = ctx.source;
+    } catch (e) {
+      d.graphError = e.message;
+    }
+  }
+
   let discovered = [];
   let discoverError = null;
   try {
@@ -242,6 +264,55 @@ resolver.define('listDecisions', async () => {
     discoverError = e.message;
   }
   return { tracked, discovered, discoverError };
+});
+
+// Cascade: graph context for a decision, with linked pages marked when they are
+// tracked decisions too (they are at risk when this decision breaks).
+async function contextWithCascade(cloudId, pageId, recordsById) {
+  const ctx = await decisionContext(cloudId, pageId);
+  const mark = (p) => {
+    const r = recordsById.get(p.pageId);
+    return {
+      ...p,
+      tracked: Boolean(r),
+      broken: r ? r.assumptions.filter((a) => a.status === 'broken').length : 0,
+    };
+  };
+
+  // Upstream: pages this decision builds on (its own outgoing links).
+  const linkedPages = ctx.linkedPages.map(mark);
+
+  // Downstream: tracked decisions that link TO this page. Graph links only point
+  // outward, so ask each other tracked decision for its links (capped at 20).
+  const dependents = [];
+  if (ctx.source === 'teamwork-graph') {
+    const others = [...recordsById.keys()].filter((id) => id !== String(pageId)).slice(0, 20);
+    for (const id of others) {
+      try {
+        const links = await linkedPagesOf(cloudId, id);
+        if (links.some((l) => l.pageId === String(pageId))) {
+          const rec = recordsById.get(id);
+          dependents.push(mark({ pageId: id, title: rec.pageTitle || rec.decision, url: rec.pageUrl || null }));
+        }
+      } catch (e) {
+        console.warn(`Cascade: could not read links of page ${id}: ${e.message}`);
+      }
+    }
+  }
+  return { ...ctx, linkedPages, dependents };
+}
+
+// 3b. Panel: who is behind this decision and what depends on it.
+resolver.define('decisionContext', async ({ payload, context }) => {
+  const records = await allRecords();
+  const byId = new Map(records.map((r) => [String(r.pageId), r]));
+  const self = byId.get(String(payload.pageId));
+  const ctx = await contextWithCascade(context.cloudId, String(payload.pageId), byId);
+  const broken = self ? self.assumptions.filter((a) => a.status === 'broken').length : 0;
+  return {
+    ...ctx,
+    atRisk: broken > 0 ? ctx.dependents : [],
+  };
 });
 
 // 4. One-click "Track": extract assumptions and save them with suggested tripwires.
@@ -266,9 +337,7 @@ resolver.define('trackPage', async ({ payload, context }) => {
 resolver.define('checkNow', async ({ payload }) => {
   const record = await kvs.get(storageKey(payload.pageId));
   if (!record || !Array.isArray(record.assumptions)) return null;
-  const checked = await checkRecord(api.asUser(), record);
-  await kvs.set(storageKey(payload.pageId), checked);
-  return checked;
+  return checkSyncStore(api.asUser(), storageKey(payload.pageId), record);
 });
 
 // 3. Load what was saved before, so the panel shows it straight away.
@@ -291,8 +360,7 @@ export async function scheduledCheck() {
     const { results, nextCursor } = await query.getMany();
     for (const { key, value } of results) {
       if (!value || !Array.isArray(value.assumptions)) continue;
-      const checked = await checkRecord(api.asApp(), value);
-      await kvs.set(key, checked);
+      const checked = await checkSyncStore(api.asApp(), key, value);
       pages += 1;
       broken += checked.brokenCount;
     }

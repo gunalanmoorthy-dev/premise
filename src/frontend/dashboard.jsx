@@ -113,6 +113,17 @@ const App = () => {
                     <PageLink url={d.url} title={d.title} />
                   </Inline>
                   {d.decision && <Text size="small">{d.decision}</Text>}
+                  {d.broken > 0 && (d.people || d.dependents) && (
+                    <Text size="small">
+                      <Strong>Affects:</Strong>{' '}
+                      {(d.people || []).length} {(d.people || []).length === 1 ? 'person' : 'people'}
+                      {(d.people || []).length ? ` (${d.people.map((u) => u.name).join(', ')})` : ''}
+                      {', '}
+                      {(d.dependents || []).length} decision{(d.dependents || []).length === 1 ? '' : 's'} built on it
+                      {(d.dependents || []).length ? ` (${d.dependents.map((p) => p.title).join(', ')})` : ''}
+                      {d.graphSource === 'teamwork-graph' ? ' (Teamwork Graph)' : ''}
+                    </Text>
+                  )}
                   <Text size="small">
                     {d.total} assumptions, {d.watched} watched
                     {d.tickets.length > 0 ? `, revisit tickets: ${d.tickets.join(', ')}` : ''}

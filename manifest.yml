@@ -29,6 +29,22 @@ modules:
         function: resolver
       title: Premise
       route: decisions
+  # Teamwork Graph connector: writes each tracked decision into the graph.
+  graph:connector:
+    - key: premise-decisions
+      name: Premise decisions
+      icons:
+        light: https://raw.githubusercontent.com/gunalanmoorthy-dev/premise/main/src/icons/premise.svg
+        dark: https://raw.githubusercontent.com/gunalanmoorthy-dev/premise/main/src/icons/premise.svg
+      objectTypes:
+        - atlassian:document
+      capabilities:
+        replicatesPermissions: false
+        syncFidelity: upsert
+        supportsIncrementalSync: true
+      datasource:
+        onConnectionChange:
+          function: onConnectionChange
   rovo:agent:
     - key: premise-hello-world-agent
       name: premise
@@ -79,6 +95,8 @@ modules:
       handler: index.scheduledCheck
     - key: bylineProps
       handler: index.bylineProps
+    - key: onConnectionChange
+      handler: index.onConnectionChange
 resources:
   - key: main
     path: src/frontend/index.jsx
@@ -90,6 +108,13 @@ permissions:
     - read:page:confluence
     # Find decision pages across the site (Confluence CQL search).
     - search:confluence
+    # Teamwork Graph: page owners, contributors and linked pages (the cascade).
+    - read:graph:page:confluence
+    - read:graph:user:atlassian
+    # Teamwork Graph connector: write decision objects into the graph.
+    - write:object:jira
+    - read:object:jira
+    - delete:object:jira
     # Save confirmed assumptions in Forge key-value storage.
     - storage:app
     # Count Jira issues that match a tripwire's JQL search.
@@ -102,3 +127,9 @@ app:
     memoryMB: 256
     architecture: arm64
   id: ari:cloud:ecosystem::app/b4441ba6-5870-4a7b-9bed-a98b5174daf4
+  # One installation for both apps, so Confluence and Jira share storage.
+  compatibility:
+    confluence:
+      required: true
+    jira:
+      required: false

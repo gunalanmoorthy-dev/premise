@@ -12,6 +12,7 @@
     "@forge/llm": "^1.0.9",
     "@forge/react": "^12.4.0",
     "@forge/resolver": "^2.0.2",
-    "react": "^18.3.1"
+    "react": "^18.3.1",
+    "@forge/teamwork-graph": "^5.3.2"
   }
 }

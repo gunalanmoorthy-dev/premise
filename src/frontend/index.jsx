@@ -90,8 +90,19 @@ const App = () => {
   const [saved, setSaved] = useState(null);
   const [draft, setDraft] = useState(null);
   const [checked, setChecked] = useState({});
+  const [graph, setGraph] = useState(null); // Teamwork Graph context for this decision
 
   const isRecord = (r) => r && Array.isArray(r.assumptions);
+
+  // Load who is behind this decision and what links to it (Teamwork Graph).
+  const loadGraph = () =>
+    invoke('decisionContext', { pageId })
+      .then(setGraph)
+      .catch((e) => setGraph({ graphError: e.message, owners: [], contributors: [], linkedPages: [], atRisk: [] }));
+
+  useEffect(() => {
+    if (pageId && saved) loadGraph();
+  }, [pageId, saved?.lastCheckedAt]);
 
   useEffect(() => {
     if (!pageId) return;
@@ -261,6 +272,52 @@ const App = () => {
           })}
           {saved.lastCheckedAt && (
             <Text size="small">Last checked {new Date(saved.lastCheckedAt).toLocaleString()}</Text>
+          )}
+          {saved.graphSync && (
+            <Text size="small">
+              {saved.graphSync.ok
+                ? `Published to Teamwork Graph ${new Date(saved.graphSync.at).toLocaleTimeString()}`
+                : `Not published to Teamwork Graph: ${saved.graphSync.reason}`}
+            </Text>
+          )}
+
+          {/* Cascade: people and pages connected to this decision */}
+          {graph && (
+            <Stack space="space.075">
+              <Text>
+                <Strong>Connected</Strong>{' '}
+                {graph.source === 'teamwork-graph' ? '(via Teamwork Graph)' : '(Teamwork Graph unavailable, basic view)'}
+              </Text>
+              {graph.atRisk?.length > 0 && (
+                <SectionMessage appearance="warning" title={`${graph.atRisk.length} linked decision${graph.atRisk.length === 1 ? '' : 's'} at risk`}>
+                  <Text>{graph.atRisk.map((p) => p.title).join(', ')} build on this decision, which has a broken assumption.</Text>
+                </SectionMessage>
+              )}
+              {[...(graph.owners || []), ...(graph.contributors || [])].length > 0 && (
+                <Text size="small">
+                  People: {[...new Map([...(graph.owners || []), ...(graph.contributors || [])].map((u) => [u.accountId, u.name])).values()].join(', ')}
+                </Text>
+              )}
+              {(graph.dependents || []).length > 0 && <Text size="small">Decisions that build on this one:</Text>}
+              {(graph.dependents || []).map((p) => (
+                <Inline key={`d-${p.pageId}`} space="space.100" alignBlock="center">
+                  <Lozenge appearance={p.broken > 0 ? 'removed' : 'moved'}>Depends on this</Lozenge>
+                  <Text size="small">{p.title}</Text>
+                </Inline>
+              ))}
+              {(graph.linkedPages || []).length > 0 && <Text size="small">This decision builds on:</Text>}
+              {(graph.linkedPages || []).map((p) => (
+                <Inline key={`l-${p.pageId}`} space="space.100" alignBlock="center">
+                  <Lozenge appearance={p.broken > 0 ? 'removed' : p.tracked ? 'success' : 'default'}>
+                    {p.broken > 0 ? 'Broken' : p.tracked ? 'Holding' : 'Page'}
+                  </Lozenge>
+                  <Text size="small">{p.title}</Text>
+                </Inline>
+              ))}
+              {(graph.linkedPages || []).length === 0 && (graph.dependents || []).length === 0 && (
+                <Text size="small">No linked decisions.</Text>
+              )}
+            </Stack>
           )}
           <Inline space="space.100">
             <LoadingButton appearance="primary" isLoading={working} onClick={checkNow}>
