@@ -45,37 +45,101 @@ modules:
       datasource:
         onConnectionChange:
           function: onConnectionChange
+  # Rovo agent: ask Premise about decisions in chat (Confluence, Jira, Rovo).
   rovo:agent:
-    - key: premise-hello-world-agent
-      name: premise
-      description: An agent for testing Forge agent functionality
+    - key: premise-agent
+      name: Premise
+      description: Tells you which team decisions rest on assumptions that no longer hold, what evidence broke them, and what else is at risk.
       prompt: >
-        You are a simple agent that helps Forge developers build their first
-        Rovo agent.
+        You are Premise, an agent that watches the assumptions behind team decisions
+        (architecture decisions, ADRs, product choices) written in Confluence.
 
-        You can create Forge logs by using the hello-world-logger action.
+        Every tracked decision has assumptions. Each assumption can have a tripwire:
+        a Jira search that trips when more than N issues match, or a date. When a
+        tripwire trips, the assumption is BROKEN, Premise opens a revisit ticket in
+        Jira and assigns it to the decision owner.
 
-        If the user hasn't provided a message when they ask you to create a log
-        ask them to provide one.
+        How to help:
+        - "What is at risk?", "any broken decisions?", "status": use list-decisions
+          (set onlyBroken to true when the user only wants problems).
+        - Questions about one decision ("why is the Postgres decision broken?",
+          "what depends on this?"), or "this page" while on a Confluence page: use
+          explain-decision. Leave decision empty to mean the current page.
+        - "Check again", "re-run", "is it still broken?": use check-decision.
+        - "Track this", "watch this decision": use track-decision.
+
+        Answer style:
+        - Lead with the verdict: which decisions are broken and why, in one or two sentences.
+        - For each broken assumption give the evidence (matching Jira issues by key),
+          the revisit ticket key, and who is affected.
+        - If other decisions depend on a broken one, say so clearly: they are at risk too.
+        - Include page links when you have them. Be brief. Never invent issues or tickets;
+          only report what the actions return.
+        - If an action returns an error or note, tell the user plainly what to do next.
       conversationStarters:
-        - Log a message to Forge logs
+        - Which of our decisions are at risk right now?
+        - Why is the Postgres decision broken?
+        - What depends on this decision?
+        - Track this decision
       actions:
-        - hello-world-logger
+        - list-decisions
+        - explain-decision
+        - check-decision
+        - track-decision
   action:
-    - key: hello-world-logger
-      name: Log a message
-      function: messageLogger
+    - key: list-decisions
+      name: List decisions
+      function: listDecisions
       actionVerb: GET
       description: >
-        When a user asks to log a message, this action logs the message to the
-        Forge logs.
+        Lists every decision Premise tracks with its health, broken assumptions,
+        Jira evidence, revisit tickets, people involved and decisions at risk.
       inputs:
-        message:
-          title: Message
+        onlyBroken:
+          title: Only broken
+          type: boolean
+          required: false
+          description: Set to true to return only decisions with broken assumptions.
+    - key: explain-decision
+      name: Explain a decision
+      function: explainDecision
+      actionVerb: GET
+      description: >
+        Returns one tracked decision in full: each assumption, its status and evidence,
+        its tripwire, revisit ticket, the people behind it, what it builds on and which
+        decisions depend on it (from Teamwork Graph).
+      inputs:
+        decision:
+          title: Decision
           type: string
-          required: true
-          description: |
-            "The message that the user has requested be logged to Forge logs"
+          required: false
+          description: Page title words, page link or page ID. Leave empty for the current Confluence page.
+    - key: check-decision
+      name: Check a decision now
+      function: checkDecision
+      actionVerb: TRIGGER
+      description: >
+        Re-runs every tripwire of one decision right now, opens revisit tickets for new
+        breaks, and returns the fresh result.
+      inputs:
+        decision:
+          title: Decision
+          type: string
+          required: false
+          description: Page title words, page link or page ID. Leave empty for the current Confluence page.
+    - key: track-decision
+      name: Track a decision
+      function: trackDecision
+      actionVerb: CREATE
+      description: >
+        Starts tracking a Confluence decision page: extracts its assumptions with AI,
+        suggests tripwires and checks them straight away.
+      inputs:
+        decision:
+          title: Decision
+          type: string
+          required: false
+          description: Page title words, page link or page ID. Leave empty for the current Confluence page.
   # Forge LLMs: lets the backend call Claude on Atlassian infrastructure.
   llm:
     - key: premise-llm
@@ -87,8 +151,14 @@ modules:
       function: scheduledCheck
       interval: hour
   function:
-    - key: messageLogger
-      handler: index.messageLogger
+    - key: listDecisions
+      handler: index.listDecisions
+    - key: explainDecision
+      handler: index.explainDecision
+    - key: checkDecision
+      handler: index.checkDecision
+    - key: trackDecision
+      handler: index.trackDecision
     - key: resolver
       handler: index.handler
     - key: scheduledCheck

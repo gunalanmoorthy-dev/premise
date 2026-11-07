@@ -349,6 +349,9 @@ resolver.define('getSaved', async ({ payload }) => {
 
 export const handler = resolver.getDefinitions();
 
+// Shared with the Rovo agent actions (src/agent.js).
+export { allRecords, contextWithCascade, extractForPage, saveForPage, checkSyncStore, storageKey, discoverPages };
+
 // Hourly job: re-check every page that has saved assumptions.
 export async function scheduledCheck() {
   let cursor;
