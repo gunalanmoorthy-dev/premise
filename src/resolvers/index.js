@@ -85,8 +85,7 @@ function parseJson(reply) {
 }
 
 // 1. Ask Claude to find the decision on the page and the assumptions it rests on.
-resolver.define('extractAssumptions', async ({ payload }) => {
-  const { pageId } = payload;
+async function extractForPage(pageId) {
   const page = await fetchPage(pageId);
 
   if (page.text.length < 40) {
@@ -139,7 +138,9 @@ resolver.define('extractAssumptions', async ({ payload }) => {
       tripwire: normaliseTripwire(a.tripwire),
     })).filter((a) => a.text),
   };
-});
+}
+
+resolver.define('extractAssumptions', async ({ payload }) => extractForPage(payload.pageId));
 
 // Clean up a tripwire from the model or the panel into one safe shape.
 function normaliseTripwire(t) {
@@ -153,8 +154,7 @@ function normaliseTripwire(t) {
 }
 
 // 2. Save the assumptions the user confirmed, then check them straight away.
-resolver.define('saveAssumptions', async ({ payload, context }) => {
-  const { pageId, decision, assumptions, ticketProjectKey } = payload;
+async function saveForPage({ pageId, decision, assumptions, ticketProjectKey, accountId }) {
   const page = await fetchPage(pageId);
   const record = {
     pageId,
@@ -163,12 +163,103 @@ resolver.define('saveAssumptions', async ({ payload, context }) => {
     ticketProjectKey: String(ticketProjectKey || '').trim().toUpperCase() || null,
     decision,
     assumptions: assumptions.map((a) => ({ ...a, tripwire: normaliseTripwire(a.tripwire) })),
-    savedBy: context.accountId,
+    savedBy: accountId,
     savedAt: new Date().toISOString(),
   };
   const checked = await checkRecord(api.asUser(), record);
   await kvs.set(storageKey(pageId), checked);
   return checked;
+}
+
+resolver.define('saveAssumptions', async ({ payload, context }) =>
+  saveForPage({ ...payload, accountId: context.accountId })
+);
+
+// Read every tracked decision record from storage.
+async function allRecords() {
+  const records = [];
+  let cursor;
+  do {
+    let query = kvs.query().where('key', WhereConditions.beginsWith('premise-page-')).limit(20);
+    if (cursor) query = query.cursor(cursor);
+    const { results, nextCursor } = await query.getMany();
+    for (const { value } of results) {
+      if (value && Array.isArray(value.assumptions)) records.push(value);
+    }
+    cursor = nextCursor;
+  } while (cursor);
+  return records;
+}
+
+// Find likely decision pages the current user can see (Confluence CQL search).
+const DECISION_CQL =
+  'type = page AND (title ~ "decision" OR title ~ "ADR" OR text ~ "\\"we decided\\"" OR text ~ "\\"decided to\\"") order by lastmodified desc';
+
+async function discoverPages() {
+  const res = await api
+    .asUser()
+    .requestConfluence(route`/wiki/rest/api/search?cql=${DECISION_CQL}&limit=${25}`, {
+      headers: { Accept: 'application/json' },
+    });
+  if (!res.ok) {
+    throw new Error(`Confluence search failed (HTTP ${res.status}): ${(await res.text()).slice(0, 150)}`);
+  }
+  const data = await res.json();
+  const base = data._links?.base || '';
+  return (data.results || [])
+    .filter((r) => r.content?.id)
+    .map((r) => ({
+      pageId: String(r.content.id),
+      title: r.content.title || r.title,
+      url: r.url ? `${base}${r.url}` : null,
+      lastModified: r.lastModified || null,
+    }));
+}
+
+// 3. Dashboard: tracked decisions plus newly discovered ones.
+resolver.define('listDecisions', async () => {
+  const records = await allRecords();
+  const trackedIds = new Set(records.map((r) => String(r.pageId)));
+  const tracked = records
+    .map((r) => ({
+      pageId: String(r.pageId),
+      title: r.pageTitle || r.decision || `Page ${r.pageId}`,
+      url: r.pageUrl || null,
+      decision: r.decision || null,
+      total: r.assumptions.length,
+      broken: r.assumptions.filter((a) => a.status === 'broken').length,
+      watched: r.assumptions.filter((a) => a.tripwire && a.tripwire.type !== 'none').length,
+      tickets: r.assumptions.map((a) => a.ticket?.key).filter(Boolean),
+      lastCheckedAt: r.lastCheckedAt || null,
+    }))
+    .sort((x, y) => y.broken - x.broken);
+
+  let discovered = [];
+  let discoverError = null;
+  try {
+    discovered = (await discoverPages()).filter((p) => !trackedIds.has(p.pageId));
+  } catch (e) {
+    discoverError = e.message;
+  }
+  return { tracked, discovered, discoverError };
+});
+
+// 4. One-click "Track": extract assumptions and save them with suggested tripwires.
+resolver.define('trackPage', async ({ payload, context }) => {
+  const extracted = await extractForPage(payload.pageId);
+  if (!extracted.assumptions || extracted.assumptions.length === 0) {
+    return { tracked: false, note: extracted.note || 'No assumptions found on this page.' };
+  }
+  // Reuse the ticket project already chosen on another decision, if any.
+  const existing = (await allRecords()).find((r) => r.ticketProjectKey);
+  const record = await saveForPage({
+    pageId: payload.pageId,
+    decision: extracted.decision,
+    assumptions: extracted.assumptions,
+    ticketProjectKey: existing?.ticketProjectKey || null,
+    accountId: context.accountId,
+  });
+  return { tracked: true, broken: record.brokenCount, total: record.assumptions.length };
 });
 
 // 2b. "Check now" button: re-run every tripwire on this page as the current user.

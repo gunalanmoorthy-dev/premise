@@ -20,6 +20,15 @@ modules:
       resolver:
         function: resolver
       title: "Premise: check assumptions"
+  # Dashboard: Confluence sidebar > Apps > Premise (all decisions in one place).
+  confluence:globalPage:
+    - key: premise-dashboard
+      resource: dashboard
+      render: native
+      resolver:
+        function: resolver
+      title: Premise
+      route: decisions
   rovo:agent:
     - key: premise-hello-world-agent
       name: premise
@@ -73,10 +82,14 @@ modules:
 resources:
   - key: main
     path: src/frontend/index.jsx
+  - key: dashboard
+    path: src/frontend/dashboard.jsx
 permissions:
   scopes:
     # Read the current page's title and body.
     - read:page:confluence
+    # Find decision pages across the site (Confluence CQL search).
+    - search:confluence
     # Save confirmed assumptions in Forge key-value storage.
     - storage:app
     # Count Jira issues that match a tripwire's JQL search.
