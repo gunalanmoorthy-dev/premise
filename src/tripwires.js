@@ -76,6 +76,25 @@ export async function checkAssumption(requester, assumption) {
       };
     }
 
+    if (tripwire.type === 'alert') {
+      // State is pushed in by the monitoring webhook (src/webhook.js); here we only read it.
+      const alert = assumption.alert;
+      const firing = alert?.state === 'firing';
+      return {
+        ...assumption,
+        status: firing ? 'broken' : 'holding',
+        checkedAt,
+        evidence: {
+          summary: !alert
+            ? 'Waiting for monitoring alerts'
+            : firing
+              ? `Alert firing: ${alert.name} (since ${new Date(alert.at).toUTCString()}, via ${alert.source})`
+              : `Alert resolved: ${alert.name} (${new Date(alert.at).toUTCString()})`,
+          issues: [],
+        },
+      };
+    }
+
     return { ...assumption, status: 'unwatched', checkedAt, evidence: null };
   } catch (e) {
     return {

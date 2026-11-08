@@ -2,7 +2,7 @@
 // The frontend calls these functions with invoke('<name>', payload).
 
 import Resolver from '@forge/resolver';
-import api, { route } from '@forge/api';
+import api, { route, webTrigger } from '@forge/api';
 import { kvs, WhereConditions } from '@forge/kvs';
 import { checkRecord } from '../tripwires';
 import { decisionContext, linkedPagesOf } from '../graph';
@@ -122,7 +122,13 @@ async function extractForPage(pageId) {
     '  Do not guess project keys or custom issue types. Set the threshold as an early warning,',
     '  so the wire trips slightly before the real limit is reached.',
     '- type "date": a YYYY-MM-DD date, when the assumption is tied to a deadline or renewal.',
-    '- type "none": when it cannot be watched from Jira or a date.',
+    '- type "alert": when the assumption is a live metric a monitoring tool measures',
+    '  (traffic, latency, error rate, cost). The team connects a Datadog, Grafana or',
+    '  Prometheus alert to it. Use only "type"; no other fields.',
+    '- type "none": only when nothing above can watch it.',
+    'Propose a tripwire for every assumption you can: prefer "jql" when Jira issues such as',
+    'incidents, bugs or requests would show the change, "alert" for live metrics, "date" for',
+    'deadlines. Use "none" for at most half of the assumptions.',
     'Also give watchHint: one short line, in plain words, explaining what the tripwire watches.',
     '',
     'Reply with JSON only, in exactly this shape:',
@@ -157,6 +163,9 @@ async function extractForPage(pageId) {
   };
 }
 
+// Webhook URL that monitoring tools call for "alert" tripwires (token added per assumption).
+resolver.define('webhookUrl', async () => webTrigger.getUrl('premise-alert-webhook'));
+
 resolver.define('extractAssumptions', async ({ payload }) => extractForPage(payload.pageId));
 
 // Clean up a tripwire from the model or the panel into one safe shape.
@@ -166,6 +175,11 @@ function normaliseTripwire(t) {
   }
   if (t?.type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(String(t.date || ''))) {
     return { type: 'date', date: String(t.date) };
+  }
+  if (t?.type === 'alert') {
+    // Secret token that the monitoring tool sends back; keep it across edits.
+    const token = /^[a-f0-9-]{36}$/.test(String(t.token || '')) ? t.token : crypto.randomUUID();
+    return { type: 'alert', token };
   }
   return { type: 'none' };
 }
