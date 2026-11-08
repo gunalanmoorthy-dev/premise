@@ -99,6 +99,12 @@ function parseJson(reply) {
 // 1. Ask Claude to find the decision on the page and the assumptions it rests on.
 async function extractForPage(pageId) {
   const page = await fetchPage(pageId);
+  return extractFromText(page.title, page.text);
+}
+
+// The extraction itself, on plain text (also used by the backtest on real ADRs).
+async function extractFromText(title, text) {
+  const page = { title, text: String(text || '') };
 
   if (page.text.length < 40) {
     return { decision: null, assumptions: [], note: 'This page has too little text to analyse.' };
@@ -404,10 +410,31 @@ resolver.define('scaleClean', async ({ context }) => {
   return cleanScaleTest();
 });
 
+resolver.define('backtestSize', async ({ context }) => {
+  devOnly(context);
+  const { backtestSize } = await import('../backtest');
+  return backtestSize();
+});
+resolver.define('backtestRun', async ({ payload, context }) => {
+  devOnly(context);
+  const { runBacktestPair } = await import('../backtest');
+  return runBacktestPair(payload.id);
+});
+resolver.define('backtestResults', async ({ context }) => {
+  devOnly(context);
+  const { backtestResults } = await import('../backtest');
+  return backtestResults();
+});
+resolver.define('backtestClear', async ({ context }) => {
+  devOnly(context);
+  const { clearBacktest } = await import('../backtest');
+  return clearBacktest();
+});
+
 export const handler = resolver.getDefinitions();
 
 // Shared with the Rovo agent actions (src/agent.js).
-export { allRecords, contextWithCascade, extractForPage, saveForPage, checkSyncStore, storageKey, discoverPages };
+export { allRecords, contextWithCascade, extractForPage, extractFromText, saveForPage, checkSyncStore, storageKey, discoverPages, pickModel, devOnly };
 
 // Hourly job: queue every tracked decision in small batches (see src/scale.js).
 export async function scheduledCheck() {

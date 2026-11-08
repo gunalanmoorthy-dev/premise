@@ -1,0 +1,301 @@
+{
+ "description": "Backtest dataset: ADRs later marked Superseded by their own teams, paired with the ADR that replaced them. Texts are not stored in this repo; fetch them from these URLs.",
+ "pairs": [
+  {
+   "id": 1,
+   "repo": "shopware/shopware",
+   "oldPath": "adr/_superseded/2020-08-10-feature-flag-system.md",
+   "newPath": "adr/2022-01-20-feature-flags-for-major-versions.md",
+   "oldUrl": "https://github.com/shopware/shopware/blob/74b3dd0e4c0d553eda28c2acb0218fb702728088/adr/_superseded/2020-08-10-feature-flag-system.md",
+   "newUrl": "https://github.com/shopware/shopware/blob/74b3dd0e4c0d553eda28c2acb0218fb702728088/adr/2022-01-20-feature-flags-for-major-versions.md"
+  },
+  {
+   "id": 2,
+   "repo": "infection/infection",
+   "oldPath": "adr/0005-Bump-PHP-versions.md",
+   "newPath": "adr/0008-PHP-version-support-policy.md",
+   "oldUrl": "https://github.com/infection/infection/blob/c93d29a806a2c1575487858db5b77657225b82ae/adr/0005-Bump-PHP-versions.md",
+   "newUrl": "https://github.com/infection/infection/blob/c93d29a806a2c1575487858db5b77657225b82ae/adr/0008-PHP-version-support-policy.md"
+  },
+  {
+   "id": 3,
+   "repo": "linode/apl-core",
+   "oldPath": "adr/2022-06-07-ingress-classes.md",
+   "newPath": "adr/2026-05-20-gateway-api.md",
+   "oldUrl": "https://github.com/linode/apl-core/blob/bbdc2c95f3a4f8cebc7c58a86b8a49c8a31a6582/adr/2022-06-07-ingress-classes.md",
+   "newUrl": "https://github.com/linode/apl-core/blob/bbdc2c95f3a4f8cebc7c58a86b8a49c8a31a6582/adr/2026-05-20-gateway-api.md"
+  },
+  {
+   "id": 4,
+   "repo": "shopware/shopware",
+   "oldPath": "adr/_superseded/2020-11-20-add-login-required-annotation.md",
+   "newPath": "adr/2022-02-09-controller-configuration-route-defaults.md",
+   "oldUrl": "https://github.com/shopware/shopware/blob/74b3dd0e4c0d553eda28c2acb0218fb702728088/adr/_superseded/2020-11-20-add-login-required-annotation.md",
+   "newUrl": "https://github.com/shopware/shopware/blob/74b3dd0e4c0d553eda28c2acb0218fb702728088/adr/2022-02-09-controller-configuration-route-defaults.md"
+  },
+  {
+   "id": 5,
+   "repo": "home-assistant/architecture",
+   "oldPath": "adr/0002-minimum-supported-python-version.md",
+   "newPath": "adr/0020-minimum-supported-python-version.md",
+   "oldUrl": "https://github.com/home-assistant/architecture/blob/5438568da4ed57c9c88b08e0c4c5782500d0be41/adr/0002-minimum-supported-python-version.md",
+   "newUrl": "https://github.com/home-assistant/architecture/blob/5438568da4ed57c9c88b08e0c4c5782500d0be41/adr/0020-minimum-supported-python-version.md"
+  },
+  {
+   "id": 6,
+   "repo": "ards-project/ard-spec",
+   "oldPath": "adr/0001-registry-introspection-explore-endpoint.md",
+   "newPath": "adr/0005-registry-shared-query-model.md",
+   "oldUrl": "https://github.com/ards-project/ard-spec/blob/f073b1ea9b01a5f068d0b0986426f2ea49fa30b2/adr/0001-registry-introspection-explore-endpoint.md",
+   "newUrl": "https://github.com/ards-project/ard-spec/blob/f073b1ea9b01a5f068d0b0986426f2ea49fa30b2/adr/0005-registry-shared-query-model.md"
+  },
+  {
+   "id": 7,
+   "repo": "govuk-forms/forms",
+   "oldPath": "ADR/ADR003-use-govuk-signon.md",
+   "newPath": "ADR/ADR015-idp-authentication.md",
+   "oldUrl": "https://github.com/govuk-forms/forms/blob/44c49d49995e7071f3a93f5827573abd13e01c16/ADR/ADR003-use-govuk-signon.md",
+   "newUrl": "https://github.com/govuk-forms/forms/blob/44c49d49995e7071f3a93f5827573abd13e01c16/ADR/ADR015-idp-authentication.md"
+  },
+  {
+   "id": 8,
+   "repo": "govuk-forms/forms",
+   "oldPath": "ADR/ADR002-use-govuk-notify.md",
+   "newPath": "ADR/ADR019-use-amazon-ses.md",
+   "oldUrl": "https://github.com/govuk-forms/forms/blob/44c49d49995e7071f3a93f5827573abd13e01c16/ADR/ADR002-use-govuk-notify.md",
+   "newUrl": "https://github.com/govuk-forms/forms/blob/44c49d49995e7071f3a93f5827573abd13e01c16/ADR/ADR019-use-amazon-ses.md"
+  },
+  {
+   "id": 9,
+   "repo": "defenseunicorns/pepr",
+   "oldPath": "adr/0011-semantic-release.md",
+   "newPath": "adr/0022-release-please.md",
+   "oldUrl": "https://github.com/defenseunicorns/pepr/blob/303e3bf1720ca5115efd04f677ed5a6b45dfd41d/adr/0011-semantic-release.md",
+   "newUrl": "https://github.com/defenseunicorns/pepr/blob/303e3bf1720ca5115efd04f677ed5a6b45dfd41d/adr/0022-release-please.md"
+  },
+  {
+   "id": 10,
+   "repo": "VirtusLab/orca",
+   "oldPath": "adr/0013-persistent-plans.md",
+   "newPath": "adr/0018-stage-bound-flow-runtime.md",
+   "oldUrl": "https://github.com/VirtusLab/orca/blob/026c41dafe82c9a24659e4f5b3c3afe578c0dfb0/adr/0013-persistent-plans.md",
+   "newUrl": "https://github.com/VirtusLab/orca/blob/026c41dafe82c9a24659e4f5b3c3afe578c0dfb0/adr/0018-stage-bound-flow-runtime.md"
+  },
+  {
+   "id": 11,
+   "repo": "PgCache/pgcache",
+   "oldPath": "ADR/ADR-002-resolved-ast.md",
+   "newPath": "ADR/ADR-057-query-tree-with-side-table-bindings.md",
+   "oldUrl": "https://github.com/PgCache/pgcache/blob/7a5fc232edc8a6a0bd172a834e9f116d75f0ae68/ADR/ADR-002-resolved-ast.md",
+   "newUrl": "https://github.com/PgCache/pgcache/blob/7a5fc232edc8a6a0bd172a834e9f116d75f0ae68/ADR/ADR-057-query-tree-with-side-table-bindings.md"
+  },
+  {
+   "id": 12,
+   "repo": "etalab-ia/OpenGateLLM",
+   "oldPath": "adr/2026-08-27-datetime-handling.md",
+   "newPath": "adr/2026-09-04-response-schema-mapping.md",
+   "oldUrl": "https://github.com/etalab-ia/OpenGateLLM/blob/803164fca4d563711600b71daf254c42abf6d7b2/adr/2026-08-27-datetime-handling.md",
+   "newUrl": "https://github.com/etalab-ia/OpenGateLLM/blob/803164fca4d563711600b71daf254c42abf6d7b2/adr/2026-09-04-response-schema-mapping.md"
+  },
+  {
+   "id": 13,
+   "repo": "TryGhost/ActivityPub",
+   "oldPath": "adr/0002-frontend-backend-versioning.md",
+   "newPath": "adr/0012-forward-compatible-api-evolution.md",
+   "oldUrl": "https://github.com/TryGhost/ActivityPub/blob/141dfcf8470e2d4f771809068863ff5e0dc98aac/adr/0002-frontend-backend-versioning.md",
+   "newUrl": "https://github.com/TryGhost/ActivityPub/blob/141dfcf8470e2d4f771809068863ff5e0dc98aac/adr/0012-forward-compatible-api-evolution.md"
+  },
+  {
+   "id": 14,
+   "repo": "SAP/ai-sdk-js",
+   "oldPath": "adr/006-responses-api.md",
+   "newPath": "adr/007-foundation-model-client-strategy.md",
+   "oldUrl": "https://github.com/SAP/ai-sdk-js/blob/3d7ba0d863767a699a254d797a7565dc779b909e/adr/006-responses-api.md",
+   "newUrl": "https://github.com/SAP/ai-sdk-js/blob/3d7ba0d863767a699a254d797a7565dc779b909e/adr/007-foundation-model-client-strategy.md"
+  },
+  {
+   "id": 15,
+   "repo": "momhq/mom",
+   "oldPath": "adr/0007-fts5-content-first-column-weights.md",
+   "newPath": "adr/0024-v050-markdown-vault-memory.md",
+   "oldUrl": "https://github.com/momhq/mom/blob/54d32ca78d8e116fe246b36a6d522817085258e3/adr/0007-fts5-content-first-column-weights.md",
+   "newUrl": "https://github.com/momhq/mom/blob/54d32ca78d8e116fe246b36a6d522817085258e3/adr/0024-v050-markdown-vault-memory.md"
+  },
+  {
+   "id": 16,
+   "repo": "momhq/mom",
+   "oldPath": "adr/0013-uuid-only-memory-ids.md",
+   "newPath": "adr/0024-v050-markdown-vault-memory.md",
+   "oldUrl": "https://github.com/momhq/mom/blob/54d32ca78d8e116fe246b36a6d522817085258e3/adr/0013-uuid-only-memory-ids.md",
+   "newUrl": "https://github.com/momhq/mom/blob/54d32ca78d8e116fe246b36a6d522817085258e3/adr/0024-v050-markdown-vault-memory.md"
+  },
+  {
+   "id": 17,
+   "repo": "remix-run/react-router",
+   "oldPath": "decisions/0003-infer-types-for-useloaderdata-and-useactiondata-from-loader-and-action-via-generics.md",
+   "newPath": "decisions/0012-type-inference.md",
+   "oldUrl": "https://github.com/remix-run/react-router/blob/fcfccb2e3cefa2bd73dc43cc68146fbaa11b180b/decisions/0003-infer-types-for-useloaderdata-and-useactiondata-from-loader-and-action-via-generics.md",
+   "newUrl": "https://github.com/remix-run/react-router/blob/fcfccb2e3cefa2bd73dc43cc68146fbaa11b180b/decisions/0012-type-inference.md"
+  },
+  {
+   "id": 18,
+   "repo": "cloudfoundry/cloud_controller_ng",
+   "oldPath": "decisions/0002-using-machinist-for-factories.md",
+   "newPath": "decisions/0015-using-factory-bot-for-factories.md",
+   "oldUrl": "https://github.com/cloudfoundry/cloud_controller_ng/blob/76bae2333109487d2d4d0f3fe15e382ce41c39bc/decisions/0002-using-machinist-for-factories.md",
+   "newUrl": "https://github.com/cloudfoundry/cloud_controller_ng/blob/76bae2333109487d2d4d0f3fe15e382ce41c39bc/decisions/0015-using-factory-bot-for-factories.md"
+  },
+  {
+   "id": 19,
+   "repo": "aws/aws-parallelcluster-ui",
+   "oldPath": "decisions/20230125-pcui-versioning-strategy.md",
+   "newPath": "decisions/20230222-make-revision-required.md",
+   "oldUrl": "https://github.com/aws/aws-parallelcluster-ui/blob/8ab006341026b65eae18e59a37464b4844863171/decisions/20230125-pcui-versioning-strategy.md",
+   "newUrl": "https://github.com/aws/aws-parallelcluster-ui/blob/8ab006341026b65eae18e59a37464b4844863171/decisions/20230222-make-revision-required.md"
+  },
+  {
+   "id": 20,
+   "repo": "Normation/rudder",
+   "oldPath": "adr/webapp/scheduling/28535-passing-discrete-scheduled-events-from-webapp-to-agent.md",
+   "newPath": "adr/webapp/scheduling/29567-passing-scheduled-events-through-a-generated-json-file.md",
+   "oldUrl": "https://github.com/Normation/rudder/blob/161eebd8be627de70528578ff44ff1a5507acf91/adr/webapp/scheduling/28535-passing-discrete-scheduled-events-from-webapp-to-agent.md",
+   "newUrl": "https://github.com/Normation/rudder/blob/161eebd8be627de70528578ff44ff1a5507acf91/adr/webapp/scheduling/29567-passing-scheduled-events-through-a-generated-json-file.md"
+  },
+  {
+   "id": 21,
+   "repo": "basecamp/hotcell",
+   "oldPath": "adr/0002-keep-the-warm-slot-home.md",
+   "newPath": "adr/0003-remove-the-persistent-slot-home.md",
+   "oldUrl": "https://github.com/basecamp/hotcell/blob/ba9657d0c32fbd6dd9c6bc7fae1731e7e04749bf/adr/0002-keep-the-warm-slot-home.md",
+   "newUrl": "https://github.com/basecamp/hotcell/blob/ba9657d0c32fbd6dd9c6bc7fae1731e7e04749bf/adr/0003-remove-the-persistent-slot-home.md"
+  },
+  {
+   "id": 22,
+   "repo": "thepartly/differential",
+   "oldPath": "adr/0010-llm-invocation-tools-denied.md",
+   "newPath": "adr/0022-the-model-fetches-its-own-context.md",
+   "oldUrl": "https://github.com/thepartly/differential/blob/982c5d64b27de657448db6109154729eadb53f0f/adr/0010-llm-invocation-tools-denied.md",
+   "newUrl": "https://github.com/thepartly/differential/blob/982c5d64b27de657448db6109154729eadb53f0f/adr/0022-the-model-fetches-its-own-context.md"
+  },
+  {
+   "id": 23,
+   "repo": "bartengine27/hostr",
+   "oldPath": "adr/20240815-use-log4brains-to-manage-the-adrs.md",
+   "newPath": "adr/documentation-tools/20240815-documentation-tools.md",
+   "oldUrl": "https://github.com/bartengine27/hostr/blob/4f9f35d3e5a37ed3080ce5f61f1e46891c3e6ed3/adr/20240815-use-log4brains-to-manage-the-adrs.md",
+   "newUrl": "https://github.com/bartengine27/hostr/blob/4f9f35d3e5a37ed3080ce5f61f1e46891c3e6ed3/adr/documentation-tools/20240815-documentation-tools.md"
+  },
+  {
+   "id": 24,
+   "repo": "lhns/newleafradio",
+   "oldPath": "adr/0012-converging-sync.md",
+   "newPath": "adr/0017-jump-only-sync.md",
+   "oldUrl": "https://github.com/lhns/newleafradio/blob/7e363b3986c797a97f6fa500de97ab0488d77f6f/adr/0012-converging-sync.md",
+   "newUrl": "https://github.com/lhns/newleafradio/blob/7e363b3986c797a97f6fa500de97ab0488d77f6f/adr/0017-jump-only-sync.md"
+  },
+  {
+   "id": 25,
+   "repo": "ferrumio/rboto",
+   "oldPath": "ADR/0007-ci-and-release-matrix.md",
+   "newPath": "ADR/0010-python315-validation-and-release-matrix.md",
+   "oldUrl": "https://github.com/ferrumio/rboto/blob/bf8ccc08c6fceff2559c2a4d692bb872e93bf67c/ADR/0007-ci-and-release-matrix.md",
+   "newUrl": "https://github.com/ferrumio/rboto/blob/bf8ccc08c6fceff2559c2a4d692bb872e93bf67c/ADR/0010-python315-validation-and-release-matrix.md"
+  },
+  {
+   "id": 26,
+   "repo": "raguram-venkat/lathe",
+   "oldPath": "adr/0006-own-lathe-loop-profile.md",
+   "newPath": "adr/0015-vendored-permissions-direct-claude.md",
+   "oldUrl": "https://github.com/raguram-venkat/lathe/blob/aaaeb0b0822dc8538088bf275b087d743e89f8c0/adr/0006-own-lathe-loop-profile.md",
+   "newUrl": "https://github.com/raguram-venkat/lathe/blob/aaaeb0b0822dc8538088bf275b087d743e89f8c0/adr/0015-vendored-permissions-direct-claude.md"
+  },
+  {
+   "id": 27,
+   "repo": "ferrumio/rboto",
+   "oldPath": "ADR/0020-service-type-namespace.md",
+   "newPath": "ADR/0021-operation-output-names.md",
+   "oldUrl": "https://github.com/ferrumio/rboto/blob/bf8ccc08c6fceff2559c2a4d692bb872e93bf67c/ADR/0020-service-type-namespace.md",
+   "newUrl": "https://github.com/ferrumio/rboto/blob/bf8ccc08c6fceff2559c2a4d692bb872e93bf67c/ADR/0021-operation-output-names.md"
+  },
+  {
+   "id": 28,
+   "repo": "hurxxxx/miy",
+   "oldPath": "adr/0011-app-first-workspace-context.md",
+   "newPath": "adr/0012-company-app-access-without-workspaces.md",
+   "oldUrl": "https://github.com/hurxxxx/miy/blob/188a8cefeced849ae0ca507654eee5493a28decd/adr/0011-app-first-workspace-context.md",
+   "newUrl": "https://github.com/hurxxxx/miy/blob/188a8cefeced849ae0ca507654eee5493a28decd/adr/0012-company-app-access-without-workspaces.md"
+  },
+  {
+   "id": 29,
+   "repo": "ravenroot-ai/ravenroot",
+   "oldPath": "adr/0001-ravenroot-product-boundaries.md",
+   "newPath": "adr/0007-process-traversal-invocation-attempt-lifecycle.md",
+   "oldUrl": "https://github.com/ravenroot-ai/ravenroot/blob/7ad64d7bbe63a46d9761e6a455b2c9fc3e2cef55/adr/0001-ravenroot-product-boundaries.md",
+   "newUrl": "https://github.com/ravenroot-ai/ravenroot/blob/7ad64d7bbe63a46d9761e6a455b2c9fc3e2cef55/adr/0007-process-traversal-invocation-attempt-lifecycle.md"
+  },
+  {
+   "id": 30,
+   "repo": "hurxxxx/miy",
+   "oldPath": "adr/0006-platform-personal-global-apps.md",
+   "newPath": "adr/0012-company-app-access-without-workspaces.md",
+   "oldUrl": "https://github.com/hurxxxx/miy/blob/188a8cefeced849ae0ca507654eee5493a28decd/adr/0006-platform-personal-global-apps.md",
+   "newUrl": "https://github.com/hurxxxx/miy/blob/188a8cefeced849ae0ca507654eee5493a28decd/adr/0012-company-app-access-without-workspaces.md"
+  },
+  {
+   "id": 31,
+   "repo": "modeled-information-format/MIF",
+   "oldPath": "adr/ADR-003-obsidian-compatibility.md",
+   "newPath": "adr/ADR-017-revert-obsidian-compatibility.md",
+   "oldUrl": "https://github.com/modeled-information-format/MIF/blob/ec494d69f6bb09cf7ef52375d35284be74a10ab3/adr/ADR-003-obsidian-compatibility.md",
+   "newUrl": "https://github.com/modeled-information-format/MIF/blob/ec494d69f6bb09cf7ef52375d35284be74a10ab3/adr/ADR-017-revert-obsidian-compatibility.md"
+  },
+  {
+   "id": 32,
+   "repo": "ravenroot-ai/ravenroot",
+   "oldPath": "adr/0005-programmable-and-agentic-nodes.md",
+   "newPath": "adr/0029-model-provider-spi-after-externalization.md",
+   "oldUrl": "https://github.com/ravenroot-ai/ravenroot/blob/7ad64d7bbe63a46d9761e6a455b2c9fc3e2cef55/adr/0005-programmable-and-agentic-nodes.md",
+   "newUrl": "https://github.com/ravenroot-ai/ravenroot/blob/7ad64d7bbe63a46d9761e6a455b2c9fc3e2cef55/adr/0029-model-provider-spi-after-externalization.md"
+  },
+  {
+   "id": 33,
+   "repo": "ThomasChangX/llm-reporting",
+   "oldPath": "adr/0004-document-structure.md",
+   "newPath": "adr/0012-document-structure-v2.md",
+   "oldUrl": "https://github.com/ThomasChangX/llm-reporting/blob/1816306d07cadaf0e45841e0c21fe36e186252ce/adr/0004-document-structure.md",
+   "newUrl": "https://github.com/ThomasChangX/llm-reporting/blob/1816306d07cadaf0e45841e0c21fe36e186252ce/adr/0012-document-structure-v2.md"
+  },
+  {
+   "id": 34,
+   "repo": "saga/agentic-data-architect",
+   "oldPath": "ADR/004-local-data-storage-boundaries.md",
+   "newPath": "ADR/027-investigation-state-persistence-boundary.md",
+   "oldUrl": "https://github.com/saga/agentic-data-architect/blob/7177cb17c2f24f7f82c12126eb15d44f8a048bf4/ADR/004-local-data-storage-boundaries.md",
+   "newUrl": "https://github.com/saga/agentic-data-architect/blob/7177cb17c2f24f7f82c12126eb15d44f8a048bf4/ADR/027-investigation-state-persistence-boundary.md"
+  },
+  {
+   "id": 35,
+   "repo": "slaghuis/data-loader",
+   "oldPath": "ADR/0011-metadata-schema-through-gorm-automigrate.md",
+   "newPath": "ADR/0012-versioned-migrations-with-goose.md",
+   "oldUrl": "https://github.com/slaghuis/data-loader/blob/947e63f4cfc0b2a318b41a888b6fed6fa889762d/ADR/0011-metadata-schema-through-gorm-automigrate.md",
+   "newUrl": "https://github.com/slaghuis/data-loader/blob/947e63f4cfc0b2a318b41a888b6fed6fa889762d/ADR/0012-versioned-migrations-with-goose.md"
+  },
+  {
+   "id": 36,
+   "repo": "270aldo/Genesis_ngx",
+   "oldPath": "ADR/001-cloud-run-over-agent-engine.md",
+   "newPath": "ADR/ADR-007-agent-engine-migration.md",
+   "oldUrl": "https://github.com/270aldo/Genesis_ngx/blob/02b82bdf827288b69b15f0dd83a3c3cceb4803d9/ADR/001-cloud-run-over-agent-engine.md",
+   "newUrl": "https://github.com/270aldo/Genesis_ngx/blob/02b82bdf827288b69b15f0dd83a3c3cceb4803d9/ADR/ADR-007-agent-engine-migration.md"
+  },
+  {
+   "id": 37,
+   "repo": "naira-project/architecture",
+   "oldPath": "adr/004-backend-plugin-system.md",
+   "newPath": "adr/005-switch-to-grpc-sidecars.md",
+   "oldUrl": "https://github.com/naira-project/architecture/blob/64f0f232fb92348214b69f363d1d927d98fac372/adr/004-backend-plugin-system.md",
+   "newUrl": "https://github.com/naira-project/architecture/blob/64f0f232fb92348214b69f363d1d927d98fac372/adr/005-switch-to-grpc-sidecars.md"
+  }
+ ]
+}

@@ -91,6 +91,83 @@ const ScaleTest = () => {
   );
 };
 
+// Developer-only backtest: real ADRs that their teams later superseded.
+const Backtest = () => {
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(null);
+  const [res, setRes] = useState(null);
+  const [note, setNote] = useState(null);
+
+  const load = async () => setRes(await invoke('backtestResults'));
+
+  const runAll = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const total = await invoke('backtestSize');
+      const done = new Set(((await invoke('backtestResults')).results || []).map((r) => r.id));
+      for (let id = 1; id <= total; id += 1) {
+        if (done.has(id)) continue;
+        setProgress(`Running pair ${id} of ${total}...`);
+        try {
+          await invoke('backtestRun', { id });
+        } catch (e) {
+          setNote(`Pair ${id} failed: ${e.message}`);
+        }
+      }
+      setProgress(null);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : 'n/a');
+
+  return (
+    <Box padding="space.150" backgroundColor="color.background.neutral">
+      <Stack space="space.100">
+        <Heading size="small">Backtest (development only)</Heading>
+        <Text size="small">
+          37 real architecture decisions from 31 public GitHub repos that their own teams later
+          superseded. Premise extracts assumptions from each old decision only; a judge reads the
+          replacement and checks whether the condition that changed was already on Premise's list.
+        </Text>
+        <Inline space="space.100">
+          <LoadingButton isLoading={busy} isDisabled={busy} onClick={runAll}>Run backtest</LoadingButton>
+          <LoadingButton isDisabled={busy} onClick={load}>Show results</LoadingButton>
+          <LoadingButton isDisabled={busy}
+            onClick={async () => { const r = await invoke('backtestClear'); setRes(null); setNote(`Cleared ${r.deleted} results.`); }}>
+            Clear
+          </LoadingButton>
+        </Inline>
+        {progress && <Text size="small">{progress}</Text>}
+        {note && <Text size="small">{note}</Text>}
+        {res && (
+          <Stack space="space.075">
+            <Text>
+              <Strong>
+                Caught {res.caught} of {res.eligible} ({pct(res.caught, res.eligible)})
+              </Strong>{' '}
+              superseded decisions: the condition that later changed was already one of Premise's
+              assumptions. {res.caughtWatchable} of those also had a tripwire suggested.
+              ({res.run} of {res.total} pairs run; {res.run - res.eligible} excluded because the
+              replacement named no changed condition.)
+            </Text>
+            {res.results.map((r) => (
+              <Text key={r.id} size="small">
+                {r.matched ? 'CAUGHT' : r.changedCondition && r.replaced ? 'MISSED' : 'EXCLUDED'} #{r.id} {r.repo}:{' '}
+                {r.changedCondition || 'no changed condition'}
+                {r.matched ? ` -> "${r.matched}"` : ''}
+              </Text>
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </Box>
+  );
+};
+
 const App = () => {
   const context = useProductContext();
   const isDev = context?.environmentType === 'DEVELOPMENT';
@@ -229,6 +306,7 @@ const App = () => {
         )}
       </Stack>
       {isDev && <ScaleTest />}
+      {isDev && <Backtest />}
     </Stack>
   );
 };

@@ -150,3 +150,6 @@ vite.config.ts.timestamp-*
 
 # Forge local build output
 .forge/
+
+# Backtest ADR texts (third-party content, bundled at deploy only). Sources: backtest-sources.json
+src/backtest/pairs.json
