@@ -231,13 +231,13 @@ const App = () => {
       {/* Summary line */}
       <Inline space="space.200">
         <Text>
-          <Strong>{tracked.length}</Strong> decisions tracked
+          <Strong>{tracked.length}</Strong> {tracked.length === 1 ? 'decision' : 'decisions'} tracked
         </Text>
         <Text>
-          <Strong>{brokenTotal}</Strong> broken assumptions
+          <Strong>{brokenTotal}</Strong> broken {brokenTotal === 1 ? 'assumption' : 'assumptions'}
         </Text>
         <Text>
-          <Strong>{discovered.length}</Strong> untracked decisions found
+          <Strong>{discovered.length}</Strong> untracked {discovered.length === 1 ? 'decision' : 'decisions'} found
         </Text>
       </Inline>
 
