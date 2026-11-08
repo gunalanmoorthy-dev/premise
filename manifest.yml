@@ -153,6 +153,16 @@ modules:
           type: string
           required: false
           description: Page title words, page link or page ID. Leave empty for the current Confluence page.
+  # MCP server: exposes Premise's actions as tools for external AI clients
+  # (Claude, Cursor, VS Code). Endpoint: https://mcp.atlassian.com/forge/<appId>
+  rovo:mcp:
+    - key: premise-mcp
+      name: Premise
+      tools:
+        - list-decisions
+        - explain-decision
+        - check-decision
+        - track-decision
   # Forge LLMs: lets the backend call Claude on Atlassian infrastructure.
   llm:
     - key: premise-llm
