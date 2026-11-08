@@ -2,16 +2,18 @@
 // The frontend calls these functions with invoke('<name>', payload).
 
 import Resolver from '@forge/resolver';
-import api, { route, webTrigger } from '@forge/api';
+import api, { route } from '@forge/api';
 import { kvs, WhereConditions } from '@forge/kvs';
-import { checkRecord } from '../tripwires';
+import { checkRecord, repairJql, validateJql } from '../tripwires';
 import { decisionContext, linkedPagesOf } from '../graph';
 import { syncDecisionToGraph } from '../connector';
 
 // Check a record, write the result into the Teamwork Graph, then store it.
 async function checkSyncStore(requester, key, record) {
   const checked = await checkRecord(requester, record);
-  checked.graphSync = await syncDecisionToGraph(checked);
+  checked.graphSync = record.synthetic
+    ? { ok: false, reason: 'scale test record, not published' }
+    : await syncDecisionToGraph(checked);
   await kvs.set(key, checked);
   return checked;
 }
@@ -122,13 +124,13 @@ async function extractForPage(pageId) {
     '  Do not guess project keys or custom issue types. Set the threshold as an early warning,',
     '  so the wire trips slightly before the real limit is reached.',
     '- type "date": a YYYY-MM-DD date, when the assumption is tied to a deadline or renewal.',
-    '- type "alert": when the assumption is a live metric a monitoring tool measures',
-    '  (traffic, latency, error rate, cost). The team connects a Datadog, Grafana or',
-    '  Prometheus alert to it. Use only "type"; no other fields.',
+    '  For a live metric (traffic, latency, error rate, cost), watch the incidents and',
+    '  monitoring alerts that tools like Datadog or Grafana raise in Jira, for example',
+    '  text ~ "orders" AND (text ~ "latency" OR text ~ "timeout" OR text ~ "alert") AND created >= -30d.',
     '- type "none": only when nothing above can watch it.',
-    'Propose a tripwire for every assumption you can: prefer "jql" when Jira issues such as',
-    'incidents, bugs or requests would show the change, "alert" for live metrics, "date" for',
-    'deadlines. Use "none" for at most half of the assumptions.',
+    'Propose a tripwire for every assumption you can: "jql" when Jira issues such as',
+    'incidents, alerts, bugs or requests would show the change, "date" for deadlines.',
+    'Use "none" for at most half of the assumptions.',
     'Also give watchHint: one short line, in plain words, explaining what the tripwire watches.',
     '',
     'Reply with JSON only, in exactly this shape:',
@@ -152,34 +154,41 @@ async function extractForPage(pageId) {
     : content || '';
 
   const result = parseJson(reply);
-  return {
-    decision: result.decision || null,
-    assumptions: (result.assumptions || []).map((a, i) => ({
-      id: `a${Date.now()}-${i}`,
-      text: String(a.text || '').trim(),
-      watchHint: String(a.watchHint || '').trim(),
-      tripwire: normaliseTripwire(a.tripwire),
-    })).filter((a) => a.text),
-  };
-}
+  const assumptions = (result.assumptions || []).map((a, i) => ({
+    id: `a${Date.now()}-${i}`,
+    text: String(a.text || '').trim(),
+    watchHint: String(a.watchHint || '').trim(),
+    tripwire: normaliseTripwire(a.tripwire),
+  })).filter((a) => a.text);
 
-// Webhook URL that monitoring tools call for "alert" tripwires (token added per assumption).
-resolver.define('webhookUrl', async () => webTrigger.getUrl('premise-alert-webhook'));
+  // The model sometimes writes invalid JQL. Check every suggested search with Jira
+  // before showing it; drop the ones Jira rejects, so a suggestion never fails later.
+  const jqlOnes = assumptions.filter((a) => a.tripwire.type === 'jql');
+  try {
+    const errors = await validateJql(api.asUser(), jqlOnes.map((a) => a.tripwire.jql));
+    jqlOnes.forEach((a, i) => {
+      if (errors[i]) {
+        console.warn(`Dropped invalid suggested JQL "${a.tripwire.jql}": ${errors[i]}`);
+        a.tripwire = { type: 'none' };
+        a.watchHint = `${a.watchHint} (The suggested Jira search was invalid; add one by hand.)`.trim();
+      }
+    });
+  } catch (e) {
+    console.warn(`JQL validation skipped: ${e.message}`);
+  }
+
+  return { decision: result.decision || null, assumptions };
+}
 
 resolver.define('extractAssumptions', async ({ payload }) => extractForPage(payload.pageId));
 
 // Clean up a tripwire from the model or the panel into one safe shape.
 function normaliseTripwire(t) {
   if (t?.type === 'jql' && String(t.jql || '').trim()) {
-    return { type: 'jql', jql: String(t.jql).trim(), threshold: Math.max(0, Number(t.threshold) || 0) };
+    return { type: 'jql', jql: repairJql(t.jql), threshold: Math.max(0, Number(t.threshold) || 0) };
   }
   if (t?.type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(String(t.date || ''))) {
     return { type: 'date', date: String(t.date) };
-  }
-  if (t?.type === 'alert') {
-    // Secret token that the monitoring tool sends back; keep it across edits.
-    const token = /^[a-f0-9-]{36}$/.test(String(t.token || '')) ? t.token : crypto.randomUUID();
-    return { type: 'alert', token };
   }
   return { type: 'none' };
 }
@@ -213,7 +222,7 @@ async function allRecords() {
     if (cursor) query = query.cursor(cursor);
     const { results, nextCursor } = await query.getMany();
     for (const { value } of results) {
-      if (value && Array.isArray(value.assumptions)) records.push(value);
+      if (value && Array.isArray(value.assumptions) && !value.synthetic) records.push(value);
     }
     cursor = nextCursor;
   } while (cursor);
@@ -368,29 +377,42 @@ resolver.define('getSaved', async ({ payload }) => {
   return record && Array.isArray(record.assumptions) ? record : null;
 });
 
+// Developer-only scale test (the dashboard shows it in the development environment only).
+const devOnly = (context) => {
+  if (context?.environmentType && context.environmentType !== 'DEVELOPMENT') {
+    throw new Error('The scale test only runs in the development environment.');
+  }
+};
+resolver.define('scaleSeed', async ({ context }) => {
+  devOnly(context);
+  const { seedScaleTest } = await import('../scale');
+  return seedScaleTest(125);
+});
+resolver.define('scaleRun', async ({ context }) => {
+  devOnly(context);
+  const { enqueueChecks } = await import('../scale');
+  return enqueueChecks(`scale-${Date.now()}`);
+});
+resolver.define('scaleStatus', async ({ payload, context }) => {
+  devOnly(context);
+  const { runStatus } = await import('../scale');
+  return runStatus(payload.runId);
+});
+resolver.define('scaleClean', async ({ context }) => {
+  devOnly(context);
+  const { cleanScaleTest } = await import('../scale');
+  return cleanScaleTest();
+});
+
 export const handler = resolver.getDefinitions();
 
 // Shared with the Rovo agent actions (src/agent.js).
 export { allRecords, contextWithCascade, extractForPage, saveForPage, checkSyncStore, storageKey, discoverPages };
 
-// Hourly job: re-check every page that has saved assumptions.
+// Hourly job: queue every tracked decision in small batches (see src/scale.js).
 export async function scheduledCheck() {
-  let cursor;
-  let pages = 0;
-  let broken = 0;
-  do {
-    let query = kvs.query().where('key', WhereConditions.beginsWith('premise-page-')).limit(20);
-    if (cursor) query = query.cursor(cursor);
-    const { results, nextCursor } = await query.getMany();
-    for (const { key, value } of results) {
-      if (!value || !Array.isArray(value.assumptions)) continue;
-      const checked = await checkSyncStore(api.asApp(), key, value);
-      pages += 1;
-      broken += checked.brokenCount;
-    }
-    cursor = nextCursor;
-  } while (cursor);
-  console.log(`Premise hourly check: ${pages} pages checked, ${broken} broken assumptions`);
+  const { enqueueChecks } = await import('../scale');
+  await enqueueChecks(`hourly-${Date.now()}`);
 }
 
 // Byline label: Confluence calls this when a page loads.

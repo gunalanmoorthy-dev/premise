@@ -14,6 +14,7 @@ import ForgeReconciler, {
   Stack,
   Strong,
   Text,
+  useProductContext,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
 
@@ -26,7 +27,73 @@ const health = (d) => {
 
 const PageLink = ({ url, title }) => (url ? <Link href={url}>{title}</Link> : <Text>{title}</Text>);
 
+
+// Developer-only scale test: 125 synthetic decisions x 4 tripwires = 500 tripwires,
+// checked through the same queued path as the hourly job.
+const ScaleTest = () => {
+  const [busy, setBusy] = useState(null);
+  const [runId, setRunId] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [note, setNote] = useState(null);
+
+  const step = (name, fn) => async () => {
+    setBusy(name);
+    setNote(null);
+    try {
+      await fn();
+    } catch (e) {
+      setNote(`Failed: ${e.message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const refresh = async (id = runId) => id && setStatus(await invoke('scaleStatus', { runId: id }));
+
+  return (
+    <Box padding="space.150" backgroundColor="color.background.neutral">
+      <Stack space="space.100">
+        <Heading size="small">Scale test (development only)</Heading>
+        <Text size="small">
+          Creates 125 test decisions with 500 Jira-search tripwires, runs the hourly check on them
+          through the batch queue, and reports the timing. Test decisions are hidden from this
+          dashboard and never published to Teamwork Graph.
+        </Text>
+        <Inline space="space.100">
+          <LoadingButton isLoading={busy === 'seed'} isDisabled={!!busy}
+            onClick={step('seed', async () => { const r = await invoke('scaleSeed'); setNote(`Created ${r.decisions} decisions, ${r.tripwires} tripwires.`); })}>
+            1. Create 500 tripwires
+          </LoadingButton>
+          <LoadingButton isLoading={busy === 'run'} isDisabled={!!busy}
+            onClick={step('run', async () => { const r = await invoke('scaleRun'); setRunId(r.runId); setStatus(null); setNote(`Queued ${r.decisions} decisions in ${r.batches} batches.`); })}>
+            2. Run check
+          </LoadingButton>
+          <LoadingButton isLoading={busy === 'refresh'} isDisabled={!!busy || !runId}
+            onClick={step('refresh', () => refresh())}>
+            3. Refresh results
+          </LoadingButton>
+          <LoadingButton isLoading={busy === 'clean'} isDisabled={!!busy}
+            onClick={step('clean', async () => { const r = await invoke('scaleClean'); setRunId(null); setStatus(null); setNote(`Removed ${r.deleted} test records.`); })}>
+            4. Clean up
+          </LoadingButton>
+        </Inline>
+        {note && <Text size="small">{note}</Text>}
+        {status && (
+          <Text size="small">
+            {status.finished ? 'Finished' : 'Running'}: {status.batchesDone} of {status.batches} batches,{' '}
+            {status.decisionsChecked} decisions and {status.tripwiresChecked} tripwires checked,{' '}
+            {status.errors} errors, slowest batch {(status.slowestBatchMs / 1000).toFixed(1)} s
+            {status.wallClockSeconds !== null ? `, total ${status.wallClockSeconds} s from start to last batch` : ''}.
+          </Text>
+        )}
+      </Stack>
+    </Box>
+  );
+};
+
 const App = () => {
+  const context = useProductContext();
+  const isDev = context?.environmentType === 'DEVELOPMENT';
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -161,6 +228,7 @@ const App = () => {
           ))
         )}
       </Stack>
+      {isDev && <ScaleTest />}
     </Stack>
   );
 };

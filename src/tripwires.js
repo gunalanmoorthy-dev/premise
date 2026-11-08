@@ -13,6 +13,42 @@ export const REVISIT_LABEL = 'premise-revisit';
 const excludeOwnTickets = (jql) =>
   `(${jql}) AND (labels is EMPTY OR labels != "${REVISIT_LABEL}")`;
 
+// Repair a common AI slip in JQL: clauses joined by commas instead of AND.
+// "a OR b, statusCategory != Done" becomes "(a OR b) AND (statusCategory != Done)".
+export function repairJql(jql) {
+  const parts = [];
+  let current = '';
+  let inQuotes = false;
+  let depth = 0; // commas inside brackets are valid JQL, e.g. status in (Open, Done)
+  for (const ch of String(jql || '')) {
+    if (ch === '"') inQuotes = !inQuotes;
+    if (!inQuotes && ch === '(') depth += 1;
+    if (!inQuotes && ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && !inQuotes && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  const clean = parts.map((p) => p.trim()).filter(Boolean);
+  return clean.length > 1 ? clean.map((p) => `(${p})`).join(' AND ') : clean[0] || '';
+}
+
+// Ask Jira whether each JQL query is valid. Returns one error string (or null) per query.
+export async function validateJql(requester, queries) {
+  if (queries.length === 0) return [];
+  const res = await requester.requestJira(route`/rest/api/3/jql/parse?validation=strict`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ queries }),
+  });
+  if (!res.ok) return queries.map(() => null); // cannot validate: let the check report it later
+  const data = await res.json();
+  return (data.queries || []).map((q) => (q.errors && q.errors.length ? q.errors.join(' ') : null));
+}
+
 // Count Jira issues matching a JQL query.
 async function countIssues(requester, jql) {
   const res = await requester.requestJira(route`/rest/api/3/search/approximate-count`, {
@@ -71,25 +107,6 @@ export async function checkAssumption(requester, assumption) {
         checkedAt,
         evidence: {
           summary: broken ? `Date reached: ${tripwire.date}` : `Watching until ${tripwire.date}`,
-          issues: [],
-        },
-      };
-    }
-
-    if (tripwire.type === 'alert') {
-      // State is pushed in by the monitoring webhook (src/webhook.js); here we only read it.
-      const alert = assumption.alert;
-      const firing = alert?.state === 'firing';
-      return {
-        ...assumption,
-        status: firing ? 'broken' : 'holding',
-        checkedAt,
-        evidence: {
-          summary: !alert
-            ? 'Waiting for monitoring alerts'
-            : firing
-              ? `Alert firing: ${alert.name} (since ${new Date(alert.at).toUTCString()}, via ${alert.source})`
-              : `Alert resolved: ${alert.name} (${new Date(alert.at).toUTCString()})`,
           issues: [],
         },
       };

@@ -168,12 +168,11 @@ modules:
     - key: premise-llm
       model:
         - claude
-  # Monitoring webhook: Datadog, Grafana or Alertmanager alerts flip "alert" tripwires.
-  webtrigger:
-    - key: premise-alert-webhook
-      function: alertWebhook
-      response:
-        type: dynamic
+  # Queue worker: the hourly check is split into batches that run in parallel.
+  consumer:
+    - key: premise-check-consumer
+      queue: premise-check-queue
+      function: checkBatchConsumer
   # Hourly: re-check every saved tripwire, even when nobody opens the page.
   scheduledTrigger:
     - key: premise-hourly-check
@@ -196,8 +195,8 @@ modules:
       handler: index.bylineProps
     - key: onConnectionChange
       handler: index.onConnectionChange
-    - key: alertWebhook
-      handler: index.alertWebhook
+    - key: checkBatchConsumer
+      handler: index.checkBatchConsumer
 resources:
   - key: main
     path: src/frontend/index.jsx

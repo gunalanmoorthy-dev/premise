@@ -27,7 +27,6 @@ const TRIPWIRE_OPTIONS = [
   { label: 'Jira search', value: 'jql' },
   { label: 'Date', value: 'date' },
   { label: "Don't watch", value: 'none' },
-  { label: 'Monitoring alert (webhook)', value: 'alert' },
 ];
 
 // Status label shown next to each saved assumption.
@@ -70,12 +69,6 @@ const TripwireEditor = ({ tripwire, onChange }) => {
           </Inline>
         </Stack>
       )}
-      {tripwire.type === 'alert' && (
-        <Text size="small">
-          After you save, Premise shows a webhook URL. Point a Datadog, Grafana or Prometheus
-          Alertmanager alert at it: firing marks this assumption Broken, resolved marks it Holding.
-        </Text>
-      )}
       {tripwire.type === 'date' && (
         <DatePicker
           value={tripwire.date || ''}
@@ -101,16 +94,8 @@ const App = () => {
   const [draft, setDraft] = useState(null);
   const [checked, setChecked] = useState({});
   const [graph, setGraph] = useState(null); // Teamwork Graph context for this decision
-  const [webhookBase, setWebhookBase] = useState(null); // URL for "alert" tripwires
 
   const isRecord = (r) => r && Array.isArray(r.assumptions);
-  const hasAlert = isRecord(saved) && saved.assumptions.some((a) => a.tripwire?.type === 'alert');
-
-  useEffect(() => {
-    if (hasAlert && !webhookBase) {
-      invoke('webhookUrl').then(setWebhookBase).catch(() => setWebhookBase(null));
-    }
-  }, [hasAlert]);
 
   // Load who is behind this decision and what links to it (Teamwork Graph).
   const loadGraph = () =>
@@ -285,25 +270,15 @@ const App = () => {
                   </Text>
                 )}
                 {a.ticketError && <Text size="small">Ticket not created: {a.ticketError}</Text>}
-                {a.tripwire?.type === 'alert' && (
-                  <Stack space="space.025">
-                    <Text size="small">
-                      <Strong>Webhook URL</Strong> (paste into your alert's webhook):
-                    </Text>
-                    <Text size="small">
-                      {webhookBase ? `${webhookBase}?token=${a.tripwire.token}` : 'Loading...'}
-                    </Text>
-                    {saved.pageUrl && (
-                      <Text size="small">
-                        <Strong>Decision link</Strong> (paste into the alert's runbook or description,
-                        so whoever gets paged sees why the limit exists): {saved.pageUrl}
-                      </Text>
-                    )}
-                  </Stack>
-                )}
               </Stack>
             );
           })}
+          {saved.pageUrl && (
+            <Text size="small">
+              <Strong>Link this decision from your alerts:</Strong> paste {saved.pageUrl} into the runbook
+              or description of related Datadog or Grafana alerts, so whoever gets paged sees why the limit exists.
+            </Text>
+          )}
           {saved.lastCheckedAt && (
             <Text size="small">Last checked {new Date(saved.lastCheckedAt).toLocaleString()}</Text>
           )}

@@ -9,5 +9,5 @@ export { handler, scheduledCheck, bylineProps } from './resolvers';
 // Teamwork Graph connector: admin connects or disconnects it.
 export { onConnectionChange } from './connector';
 
-// Monitoring webhook for "alert" tripwires (Datadog, Grafana, Alertmanager).
-export { alertWebhook } from './webhook';
+// Queue worker for the batched tripwire check.
+export { checkBatchConsumer } from './scale';

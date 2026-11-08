@@ -58,8 +58,7 @@ const assumptionView = (a) => ({
   evidence: a.evidence?.summary || null,
   evidenceIssues: (a.evidence?.issues || []).map((i) => `${i.key}: ${i.summary}`),
   watchedBy: a.tripwire?.type === 'jql' ? `Jira search: ${a.tripwire.jql} (limit ${a.tripwire.threshold})`
-    : a.tripwire?.type === 'date' ? `Date: ${a.tripwire.date}`
-    : a.tripwire?.type === 'alert' ? 'Monitoring alert (webhook)' : 'not watched',
+    : a.tripwire?.type === 'date' ? `Date: ${a.tripwire.date}` : 'not watched',
   revisitTicket: a.ticket?.key || null,
 });
 
