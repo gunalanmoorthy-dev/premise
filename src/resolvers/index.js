@@ -130,6 +130,8 @@ async function extractFromText(title, text) {
     '  Do not guess project keys or custom issue types. Set the threshold as an early warning,',
     '  so the wire trips slightly before the real limit is reached.',
     '- type "date": a YYYY-MM-DD date, when the assumption is tied to a deadline or renewal.',
+    `  Today is ${new Date().toISOString().slice(0, 10)}. The date must be in the future; if the page only`,
+    '  gives a date that has already passed, do not use a date tripwire.',
     '  For a live metric (traffic, latency, error rate, cost), watch the incidents and',
     '  monitoring alerts that tools like Datadog or Grafana raise in Jira, for example',
     '  text ~ "orders" AND (text ~ "latency" OR text ~ "timeout" OR text ~ "alert") AND created >= -30d.',
@@ -166,6 +168,12 @@ async function extractFromText(title, text) {
     watchHint: String(a.watchHint || '').trim(),
     tripwire: normaliseTripwire(a.tripwire),
   })).filter((a) => a.text);
+
+  // A date that has already passed would break the moment it is saved: drop it.
+  const today = new Date().toISOString().slice(0, 10);
+  for (const a of assumptions) {
+    if (a.tripwire.type === 'date' && a.tripwire.date <= today) a.tripwire = { type: 'none' };
+  }
 
   // The model sometimes writes invalid JQL. Check every suggested search with Jira
   // before showing it; drop the ones Jira rejects, so a suggestion never fails later.

@@ -72,7 +72,11 @@ const TripwireEditor = ({ tripwire, onChange }) => {
       {tripwire.type === 'date' && (
         <DatePicker
           value={tripwire.date || ''}
-          onChange={(value) => onChange({ ...tripwire, date: value })}
+          onChange={(value) => {
+            // The picker also fires when it gains focus; only update on a real change,
+            // otherwise React loops forever (error #185).
+            if (value !== (tripwire.date || '')) onChange({ ...tripwire, date: value });
+          }}
         />
       )}
     </Stack>
