@@ -186,7 +186,12 @@ async function extractFromText(title, text) {
   return { decision: result.decision || null, assumptions };
 }
 
-resolver.define('extractAssumptions', async ({ payload }) => extractForPage(payload.pageId));
+resolver.define('extractAssumptions', async ({ payload }) => {
+  const result = await extractForPage(payload.pageId);
+  // Suggest the ticket project the team already uses, so new decisions need no typing.
+  const withProject = (await allRecords()).find((r) => r.ticketProjectKey);
+  return { ...result, defaultTicketProjectKey: withProject?.ticketProjectKey || null };
+});
 
 // Clean up a tripwire from the model or the panel into one safe shape.
 function normaliseTripwire(t) {

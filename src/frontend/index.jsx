@@ -141,7 +141,7 @@ const App = () => {
         result?.decision,
         Array.isArray(result?.assumptions) ? result.assumptions : [],
         result?.note,
-        saved?.ticketProjectKey
+        saved?.ticketProjectKey || result?.defaultTicketProjectKey
       );
     });
 
