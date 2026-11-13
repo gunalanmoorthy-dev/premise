@@ -74,3 +74,20 @@ export async function syncDecisionToGraph(record) {
     return { ok: false, reason: e.message.slice(0, 200) };
   }
 }
+
+// Remove one decision from the graph (used by "Stop tracking"). Never throws.
+export async function removeDecisionFromGraph(pageId) {
+  try {
+    const conn = await kvs.get(CONNECTION_KEY);
+    if (!conn?.connectionId) return { ok: false, reason: 'connector not connected' };
+    const res = await graph.deleteObjectsByExternalId({
+      connectionId: conn.connectionId,
+      objectType: 'atlassian:document',
+      externalIds: [`premise-decision-${pageId}`],
+    });
+    return res?.success ? { ok: true } : { ok: false, reason: String(res?.error || 'delete failed').slice(0, 200) };
+  } catch (e) {
+    console.warn(`Teamwork Graph delete failed for page ${pageId}: ${e.message}`);
+    return { ok: false, reason: e.message.slice(0, 200) };
+  }
+}

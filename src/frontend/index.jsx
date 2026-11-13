@@ -173,6 +173,14 @@ const App = () => {
       if (isRecord(record)) setSaved(record);
     });
 
+  const stopTracking = () =>
+    run(async () => {
+      await invoke('stopTracking', { pageId });
+      setSaved(null);
+      setDraft(null);
+      setGraph(null);
+    });
+
   if (!context) return <Text>Loading Premise...</Text>;
   if (!pageId) {
     return (
@@ -343,6 +351,9 @@ const App = () => {
             </Button>
             <LoadingButton appearance="subtle" isLoading={working} onClick={extract}>
               Extract again
+            </LoadingButton>
+            <LoadingButton appearance="subtle" isLoading={working} onClick={stopTracking}>
+              Stop tracking
             </LoadingButton>
           </Inline>
         </Stack>

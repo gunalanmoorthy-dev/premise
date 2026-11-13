@@ -6,7 +6,7 @@ import api, { route } from '@forge/api';
 import { kvs, WhereConditions } from '@forge/kvs';
 import { checkRecord, repairJql, validateJql } from '../tripwires';
 import { decisionContext, linkedPagesOf } from '../graph';
-import { syncDecisionToGraph } from '../connector';
+import { syncDecisionToGraph, removeDecisionFromGraph } from '../connector';
 
 // Check a record, write the result into the Teamwork Graph, then store it.
 async function checkSyncStore(requester, key, record) {
@@ -387,6 +387,14 @@ resolver.define('checkNow', async ({ payload }) => {
   const record = await kvs.get(storageKey(payload.pageId));
   if (!record || !Array.isArray(record.assumptions)) return null;
   return checkSyncStore(api.asUser(), storageKey(payload.pageId), record);
+});
+
+// 2c. "Stop tracking" button: forget this decision and remove it from the graph.
+// Revisit tickets already opened in Jira are left alone.
+resolver.define('stopTracking', async ({ payload }) => {
+  await removeDecisionFromGraph(payload.pageId);
+  await kvs.delete(storageKey(payload.pageId));
+  return { ok: true };
 });
 
 // 3. Load what was saved before, so the panel shows it straight away.
