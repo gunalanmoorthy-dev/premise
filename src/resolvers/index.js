@@ -15,8 +15,72 @@ async function checkSyncStore(requester, key, record) {
     ? { ok: false, reason: 'scale test record, not published' }
     : await syncDecisionToGraph(checked);
   await kvs.set(key, checked);
+  await indexUpsert(checked);
   return checked;
 }
+
+// ---------------------------------------------------------------------------
+// Summary index. One key holds a small summary of every tracked decision, so
+// the dashboard and the agent read a single value instead of walking every
+// record. Full records are loaded only for the decisions that need detail.
+// The index is a cache: it is rebuilt from storage whenever it is missing, and
+// a failure to update it never fails the write it came from.
+// ---------------------------------------------------------------------------
+const INDEX_KEY = 'premise-index';
+
+function toSummary(r) {
+  return {
+    pageId: String(r.pageId),
+    title: r.pageTitle || r.decision || `Page ${r.pageId}`,
+    url: r.pageUrl || null,
+    decision: r.decision || null,
+    total: r.assumptions.length,
+    broken: r.assumptions.filter((a) => a.status === 'broken').length,
+    watched: r.assumptions.filter((a) => a.tripwire && a.tripwire.type !== 'none').length,
+    tickets: r.assumptions.map((a) => a.ticket?.key).filter(Boolean),
+    lastCheckedAt: r.lastCheckedAt || null,
+    ticketProjectKey: r.ticketProjectKey || null,
+  };
+}
+
+async function rebuildIndex() {
+  const items = (await allRecords()).map(toSummary);
+  await kvs.set(INDEX_KEY, { items, rebuiltAt: new Date().toISOString() });
+  return items;
+}
+
+async function allSummaries() {
+  try {
+    const idx = await kvs.get(INDEX_KEY);
+    if (idx && Array.isArray(idx.items)) return idx.items;
+  } catch (e) {
+    console.warn(`Premise index read failed, falling back to a full scan: ${e.message}`);
+  }
+  return rebuildIndex();
+}
+
+async function indexUpsert(record) {
+  if (!record || record.synthetic) return;
+  try {
+    const items = (await allSummaries()).filter((i) => i.pageId !== String(record.pageId));
+    items.push(toSummary(record));
+    await kvs.set(INDEX_KEY, { items, rebuiltAt: new Date().toISOString() });
+  } catch (e) {
+    console.warn(`Premise index update failed for page ${record.pageId}: ${e.message}`);
+  }
+}
+
+async function indexRemove(pageId) {
+  try {
+    const items = (await allSummaries()).filter((i) => i.pageId !== String(pageId));
+    await kvs.set(INDEX_KEY, { items, rebuiltAt: new Date().toISOString() });
+  } catch (e) {
+    console.warn(`Premise index remove failed for page ${pageId}: ${e.message}`);
+  }
+}
+
+// One full record, for the places that need assumption detail.
+const recordById = (pageId) => kvs.get(storageKey(pageId));
 import { chat, list } from '@forge/llm';
 
 const resolver = new Resolver();
@@ -275,24 +339,12 @@ async function discoverPages() {
 
 // 3. Dashboard: tracked decisions plus newly discovered ones.
 resolver.define('listDecisions', async ({ context }) => {
-  const records = await allRecords();
-  const trackedIds = new Set(records.map((r) => String(r.pageId)));
-  const tracked = records
-    .map((r) => ({
-      pageId: String(r.pageId),
-      title: r.pageTitle || r.decision || `Page ${r.pageId}`,
-      url: r.pageUrl || null,
-      decision: r.decision || null,
-      total: r.assumptions.length,
-      broken: r.assumptions.filter((a) => a.status === 'broken').length,
-      watched: r.assumptions.filter((a) => a.tripwire && a.tripwire.type !== 'none').length,
-      tickets: r.assumptions.map((a) => a.ticket?.key).filter(Boolean),
-      lastCheckedAt: r.lastCheckedAt || null,
-    }))
-    .sort((x, y) => y.broken - x.broken);
+  const summaries = await allSummaries();
+  const trackedIds = new Set(summaries.map((s) => String(s.pageId)));
+  const tracked = summaries.map((s) => ({ ...s })).sort((x, y) => y.broken - x.broken);
 
   // For broken decisions only, ask the graph who and what they affect.
-  const byId = new Map(records.map((r) => [String(r.pageId), r]));
+  const byId = new Map(summaries.map((s) => [String(s.pageId), s]));
   for (const d of tracked.filter((t) => t.broken > 0)) {
     try {
       const ctx = await contextWithCascade(context.cloudId, d.pageId, byId);
@@ -324,7 +376,7 @@ async function contextWithCascade(cloudId, pageId, recordsById) {
     return {
       ...p,
       tracked: Boolean(r),
-      broken: r ? r.assumptions.filter((a) => a.status === 'broken').length : 0,
+      broken: !r ? 0 : typeof r.broken === 'number' ? r.broken : r.assumptions.filter((a) => a.status === 'broken').length,
     };
   };
 
@@ -341,7 +393,14 @@ async function contextWithCascade(cloudId, pageId, recordsById) {
         const links = await linkedPagesOf(cloudId, id);
         if (links.some((l) => l.pageId === String(pageId))) {
           const rec = recordsById.get(id);
-          dependents.push(mark({ pageId: id, title: rec.pageTitle || rec.decision, url: rec.pageUrl || null }));
+          // rec is a summary (title/url) or a full record (pageTitle/pageUrl).
+          dependents.push(
+            mark({
+              pageId: id,
+              title: rec.pageTitle || rec.title || rec.decision,
+              url: rec.pageUrl || rec.url || null,
+            })
+          );
         }
       } catch (e) {
         console.warn(`Cascade: could not read links of page ${id}: ${e.message}`);
@@ -371,7 +430,7 @@ resolver.define('trackPage', async ({ payload, context }) => {
     return { tracked: false, note: extracted.note || 'No assumptions found on this page.' };
   }
   // Reuse the ticket project already chosen on another decision, if any.
-  const existing = (await allRecords()).find((r) => r.ticketProjectKey);
+  const existing = (await allSummaries()).find((r) => r.ticketProjectKey);
   const record = await saveForPage({
     pageId: payload.pageId,
     decision: extracted.decision,
@@ -394,6 +453,7 @@ resolver.define('checkNow', async ({ payload }) => {
 resolver.define('stopTracking', async ({ payload }) => {
   await removeDecisionFromGraph(payload.pageId);
   await kvs.delete(storageKey(payload.pageId));
+  await indexRemove(payload.pageId);
   return { ok: true };
 });
 
@@ -455,7 +515,7 @@ resolver.define('backtestClear', async ({ context }) => {
 export const handler = resolver.getDefinitions();
 
 // Shared with the Rovo agent actions (src/agent.js).
-export { allRecords, contextWithCascade, extractForPage, extractFromText, saveForPage, checkSyncStore, storageKey, discoverPages, pickModel, devOnly };
+export { allRecords, allSummaries, rebuildIndex, recordById, contextWithCascade, extractForPage, extractFromText, saveForPage, checkSyncStore, storageKey, discoverPages, pickModel, devOnly };
 
 // Hourly job: queue every tracked decision in small batches (see src/scale.js).
 export async function scheduledCheck() {

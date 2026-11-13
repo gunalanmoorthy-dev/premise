@@ -175,6 +175,7 @@ const App = () => {
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState(null);
+  const [bulk, setBulk] = useState(null);
 
   const load = () =>
     invoke('listDecisions')
@@ -204,6 +205,31 @@ const App = () => {
     }
   };
 
+  // One-click setup: track every decision Premise found, in one pass.
+  const trackAll = async () => {
+    const list = data?.discovered || [];
+    setMessage(null);
+    setError(null);
+    setBulk({ done: 0, total: list.length });
+    let tracked = 0;
+    let skipped = 0;
+    for (let i = 0; i < list.length; i++) {
+      try {
+        const result = await invoke('trackPage', { pageId: list[i].pageId });
+        result.tracked ? (tracked += 1) : (skipped += 1);
+      } catch (e) {
+        skipped += 1;
+      }
+      setBulk({ done: i + 1, total: list.length });
+    }
+    setBulk(null);
+    setMessage(
+      `Now tracking ${tracked} ${tracked === 1 ? 'decision' : 'decisions'}` +
+        (skipped ? `. ${skipped} had no assumptions Premise could read.` : '.')
+    );
+    await load();
+  };
+
   if (!data && !error) return <Text>Loading decisions...</Text>;
 
   const tracked = data?.tracked || [];
@@ -225,6 +251,32 @@ const App = () => {
       {message && (
         <SectionMessage appearance="success" title="Done">
           <Text>{message}</Text>
+        </SectionMessage>
+      )}
+
+      {tracked.length === 0 && discovered.length > 0 && !bulk && (
+        <SectionMessage appearance="information" title="Set Premise up in one click">
+          <Stack space="space.150">
+            <Text>
+              Premise found <Strong>{discovered.length}</Strong>{' '}
+              {discovered.length === 1 ? 'decision page' : 'decision pages'} on this site. Track them all
+              and it reads the assumptions behind each one, proposes a tripwire for every assumption, and
+              starts watching straight away.
+            </Text>
+            <Inline>
+              <LoadingButton appearance="primary" isLoading={false} isDisabled={busyId !== null} onClick={trackAll}>
+                Track all {discovered.length}
+              </LoadingButton>
+            </Inline>
+          </Stack>
+        </SectionMessage>
+      )}
+      {bulk && (
+        <SectionMessage appearance="information" title="Setting up">
+          <Text>
+            Reading decision {bulk.done + (bulk.done < bulk.total ? 1 : 0)} of {bulk.total}. This takes a few
+            seconds per page.
+          </Text>
         </SectionMessage>
       )}
 
@@ -287,6 +339,13 @@ const App = () => {
           Pages whose title mentions a decision or ADR, or whose text says "we decided" or "decided to".
         </Text>
         {data?.discoverError && <Text>Search failed: {data.discoverError}</Text>}
+        {discovered.length > 1 && tracked.length > 0 && !bulk && (
+          <Inline>
+            <LoadingButton appearance="primary" isLoading={false} isDisabled={busyId !== null} onClick={trackAll}>
+              Track all {discovered.length}
+            </LoadingButton>
+          </Inline>
+        )}
         {discovered.length === 0 ? (
           <Text>No untracked decisions found.</Text>
         ) : (

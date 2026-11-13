@@ -6,6 +6,8 @@ import { kvs } from '@forge/kvs';
 import {
   allRecords,
   contextWithCascade,
+  allSummaries,
+  recordById,
   extractForPage,
   saveForPage,
   checkSyncStore,
@@ -65,36 +67,39 @@ const assumptionView = (a) => ({
 // Action 1: overview of every tracked decision, broken ones first.
 export async function listDecisions(payload) {
   const onlyBroken = String(payload?.onlyBroken ?? '').toLowerCase() === 'true';
-  const records = await allRecords();
-  const byId = new Map(records.map((r) => [String(r.pageId), r]));
+  // Read the summary index, then load full records only for broken decisions:
+  // a holding decision needs no assumption detail.
+  const summaries = await allSummaries();
+  const byId = new Map(summaries.map((s) => [String(s.pageId), s]));
   const rows = [];
-  for (const r of records) {
-    const broken = r.assumptions.filter((a) => a.status === 'broken');
-    if (onlyBroken && broken.length === 0) continue;
+  for (const s of summaries) {
+    if (onlyBroken && s.broken === 0) continue;
+    const r = s.broken > 0 ? await recordById(s.pageId) : null;
+    const broken = r ? r.assumptions.filter((a) => a.status === 'broken') : [];
     const row = {
-      decision: r.decision || r.pageTitle,
-      page: r.pageTitle,
-      url: r.pageUrl,
-      health: broken.length > 0 ? `${broken.length} broken of ${r.assumptions.length}` : `all ${r.assumptions.length} holding`,
+      decision: s.decision || s.title,
+      page: s.title,
+      url: s.url,
+      health: s.broken > 0 ? `${s.broken} broken of ${s.total}` : `all ${s.total} holding`,
       brokenAssumptions: broken.map(assumptionView),
-      lastChecked: r.lastCheckedAt || null,
+      lastChecked: s.lastCheckedAt || null,
     };
-    if (broken.length > 0 && cloudIdOf(payload)) {
+    if (s.broken > 0 && cloudIdOf(payload)) {
       try {
-        const ctx = await contextWithCascade(cloudIdOf(payload), String(r.pageId), byId);
+        const ctx = await contextWithCascade(cloudIdOf(payload), String(s.pageId), byId);
         row.people = [...new Set([...ctx.owners, ...ctx.contributors].map((u) => u.name))];
         row.decisionsAtRisk = ctx.dependents.map((d) => d.title);
       } catch (e) {
         row.graphError = e.message;
       }
     }
-    rows.push({ ...row, _broken: broken.length });
+    rows.push({ ...row, _broken: s.broken });
   }
   rows.sort((a, b) => b._broken - a._broken);
   rows.forEach((r) => delete r._broken);
   return {
-    trackedCount: records.length,
-    brokenDecisions: records.filter((r) => r.assumptions.some((a) => a.status === 'broken')).length,
+    trackedCount: summaries.length,
+    brokenDecisions: summaries.filter((s) => s.broken > 0).length,
     decisions: rows,
   };
 }
