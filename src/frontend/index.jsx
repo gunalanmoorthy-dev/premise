@@ -43,6 +43,22 @@ const withTripwire = (a) => ({ ...a, tripwire: a.tripwire || { type: 'none' } })
 // Editor for one assumption's tripwire inside the review step.
 const TripwireEditor = ({ tripwire, onChange }) => {
   const selected = TRIPWIRE_OPTIONS.find((o) => o.value === tripwire.type) || TRIPWIRE_OPTIONS[2];
+  const [preview, setPreview] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const limit = Number(tripwire.threshold ?? 0);
+
+  // Run the search without saving it, so the limit is set against a real number.
+  const test = async () => {
+    setTesting(true);
+    try {
+      setPreview(await invoke('previewTripwire', { jql: tripwire.jql, exclude: tripwire.exclude }));
+    } catch (e) {
+      setPreview({ ok: false, error: e.message });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <Stack space="space.075">
       <Select
@@ -55,7 +71,10 @@ const TripwireEditor = ({ tripwire, onChange }) => {
           <Textfield
             placeholder='text ~ "orders" AND created >= -30d'
             value={tripwire.jql || ''}
-            onChange={(e) => onChange({ ...tripwire, jql: e.target.value })}
+            onChange={(e) => {
+              setPreview(null); // the old result no longer describes this query
+              onChange({ ...tripwire, jql: e.target.value });
+            }}
           />
           <Inline space="space.100" alignBlock="center">
             <Text>Trips when more than</Text>
@@ -66,7 +85,46 @@ const TripwireEditor = ({ tripwire, onChange }) => {
               onChange={(e) => onChange({ ...tripwire, threshold: Number(e.target.value) })}
             />
             <Text>issues match</Text>
+            <LoadingButton
+              appearance="subtle"
+              isLoading={testing}
+              isDisabled={!String(tripwire.jql || '').trim()}
+              onClick={test}
+            >
+              Test
+            </LoadingButton>
           </Inline>
+          {preview && !preview.ok && (
+            <Inline space="space.100" alignBlock="center">
+              <Lozenge appearance="moved">Search not run</Lozenge>
+              <Text size="small">{preview.error}</Text>
+            </Inline>
+          )}
+          {preview?.ok && (
+            <Stack space="space.050">
+              <Inline space="space.100" alignBlock="center">
+                <Lozenge appearance={preview.count > limit ? 'removed' : 'success'}>
+                  {preview.count > limit ? 'Would trip now' : 'Would hold'}
+                </Lozenge>
+                <Text size="small">
+                  {preview.count} issue{preview.count === 1 ? '' : 's'} match today.{' '}
+                  {preview.count > limit
+                    ? `Raise the limit above ${preview.count} unless you want this flagged immediately.`
+                    : `${limit - preview.count + 1} more would trip it.`}
+                </Text>
+              </Inline>
+              {preview.issues.map((i) => (
+                <Text key={i.key} size="small">
+                  {i.key}: {i.summary}
+                </Text>
+              ))}
+              {preview.count === 0 && (
+                <Text size="small">
+                  Nothing matches yet. Check the search is right, or this wire will never trip.
+                </Text>
+              )}
+            </Stack>
+          )}
         </Stack>
       )}
       {tripwire.type === 'date' && (
@@ -181,6 +239,20 @@ const App = () => {
       setGraph(null);
     });
 
+  // A search is a proxy for reality. When it catches the wrong issue, the person
+  // reading the evidence is the one who can say so.
+  const dismissIssue = (assumptionId, issueKey) =>
+    run(async () => {
+      const record = await invoke('dismissIssue', { pageId, assumptionId, issueKey });
+      if (isRecord(record)) setSaved(record);
+    });
+
+  const restoreDismissed = (assumptionId) =>
+    run(async () => {
+      const record = await invoke('restoreDismissed', { pageId, assumptionId });
+      if (isRecord(record)) setSaved(record);
+    });
+
   if (!context) return <Text>Loading Premise...</Text>;
   if (!pageId) {
     return (
@@ -271,14 +343,43 @@ const App = () => {
                 </Inline>
                 {a.evidence?.summary && <Text size="small">{a.evidence.summary}</Text>}
                 {(a.evidence?.issues || []).map((i) => (
-                  <Text key={i.key} size="small">
-                    {i.key}: {i.summary}
-                  </Text>
+                  <Inline key={i.key} space="space.100" alignBlock="center">
+                    <Text size="small">
+                      {i.key}: {i.summary}
+                    </Text>
+                    <LoadingButton
+                      appearance="subtle"
+                      spacing="compact"
+                      isLoading={working}
+                      onClick={() => dismissIssue(a.id, i.key)}
+                    >
+                      Not relevant
+                    </LoadingButton>
+                  </Inline>
                 ))}
+                {(a.evidence?.dismissed || []).length > 0 && (
+                  <Inline space="space.100" alignBlock="center">
+                    <Text size="small">Not counted: {a.evidence.dismissed.join(', ')}</Text>
+                    <LoadingButton
+                      appearance="subtle"
+                      spacing="compact"
+                      isLoading={working}
+                      onClick={() => restoreDismissed(a.id)}
+                    >
+                      Count them again
+                    </LoadingButton>
+                  </Inline>
+                )}
                 {a.ticket?.key && (
                   <Text size="small">
                     <Strong>Revisit ticket:</Strong> {a.ticket.key}
                     {a.ticket.assignee ? ' (assigned to the decision owner)' : ' (unassigned)'}
+                  </Text>
+                )}
+                {a.pastTicket?.key && (
+                  <Text size="small">
+                    This assumption holds again. {a.pastTicket.key} was opened while it was broken
+                    and is still in Jira, so close it if the question is settled.
                   </Text>
                 )}
                 {a.ticketError && <Text size="small">Ticket not created: {a.ticketError}</Text>}

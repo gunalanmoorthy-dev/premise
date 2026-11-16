@@ -4,7 +4,7 @@
 import Resolver from '@forge/resolver';
 import api, { route } from '@forge/api';
 import { kvs, WhereConditions } from '@forge/kvs';
-import { checkRecord, repairJql, validateJql } from '../tripwires';
+import { checkRecord, cleanIssueKeys, previewJql, repairJql, validateJql } from '../tripwires';
 import { decisionContext, linkedPagesOf } from '../graph';
 import { syncDecisionToGraph, removeDecisionFromGraph } from '../connector';
 
@@ -268,7 +268,13 @@ resolver.define('extractAssumptions', async ({ payload }) => {
 // Clean up a tripwire from the model or the panel into one safe shape.
 function normaliseTripwire(t) {
   if (t?.type === 'jql' && String(t.jql || '').trim()) {
-    return { type: 'jql', jql: repairJql(t.jql), threshold: Math.max(0, Number(t.threshold) || 0) };
+    const exclude = cleanIssueKeys(t.exclude);
+    return {
+      type: 'jql',
+      jql: repairJql(t.jql),
+      threshold: Math.max(0, Number(t.threshold) || 0),
+      ...(exclude.length ? { exclude } : {}),
+    };
   }
   if (t?.type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(String(t.date || ''))) {
     return { type: 'date', date: String(t.date) };
@@ -448,6 +454,41 @@ resolver.define('checkNow', async ({ payload }) => {
   return checkSyncStore(api.asUser(), storageKey(payload.pageId), record);
 });
 
+// 2b-i. "Test" button in the tripwire editor: what does this search match today?
+// Nothing is saved, so it is safe to press while still typing the query.
+resolver.define('previewTripwire', async ({ payload }) =>
+  previewJql(api.asUser(), payload.jql, payload.exclude)
+);
+
+// Change one assumption's tripwire in place, then re-check the page so the
+// status on screen reflects the change straight away.
+async function editTripwire(pageId, assumptionId, change) {
+  const key = storageKey(pageId);
+  const record = await kvs.get(key);
+  if (!record || !Array.isArray(record.assumptions)) return null;
+  record.assumptions = record.assumptions.map((a) =>
+    a.id === assumptionId && a.tripwire?.type === 'jql'
+      ? { ...a, tripwire: { ...a.tripwire, ...change(a.tripwire) } }
+      : a
+  );
+  return checkSyncStore(api.asUser(), key, record);
+}
+
+// 2b-ii. "Not relevant": stop one issue counting toward an assumption. A text
+// search is a proxy for reality, so a human has to be able to correct it.
+resolver.define('dismissIssue', async ({ payload }) => {
+  const [issueKey] = cleanIssueKeys([payload.issueKey]);
+  if (!issueKey) throw new Error(`Not a Jira issue key: ${payload.issueKey}`);
+  return editTripwire(payload.pageId, payload.assumptionId, (t) => ({
+    exclude: cleanIssueKeys([...(t.exclude || []), issueKey]),
+  }));
+});
+
+// 2b-iii. Undo every dismissal on one assumption.
+resolver.define('restoreDismissed', async ({ payload }) =>
+  editTripwire(payload.pageId, payload.assumptionId, () => ({ exclude: [] }))
+);
+
 // 2c. "Stop tracking" button: forget this decision and remove it from the graph.
 // Revisit tickets already opened in Jira are left alone.
 resolver.define('stopTracking', async ({ payload }) => {
@@ -544,10 +585,19 @@ export async function bylineProps(event) {
 
   const broken = record.assumptions.filter((a) => a.status === 'broken').length;
   const total = record.assumptions.length;
+  const watched = record.assumptions.filter((a) => a.tripwire && a.tripwire.type !== 'none').length;
   if (broken > 0) {
     return {
       title: `Premise: ${broken} broken`,
       tooltip: `${broken} of ${total} assumptions behind this decision no longer hold`,
+    };
+  }
+  // An assumption with no tripwire is not being checked, so it is not "holding".
+  if (watched < total) {
+    const idle = total - watched;
+    return {
+      title: `Premise: ${watched} holding`,
+      tooltip: `${watched} of ${total} assumptions are watched and still hold. ${idle} ${idle === 1 ? 'has' : 'have'} no tripwire.`,
     };
   }
   return {

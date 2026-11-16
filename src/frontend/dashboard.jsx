@@ -176,6 +176,7 @@ const App = () => {
   const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState(null);
   const [bulk, setBulk] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = () =>
     invoke('listDecisions')
@@ -192,12 +193,14 @@ const App = () => {
     setError(null);
     try {
       const result = await invoke('trackPage', { pageId: page.pageId });
+      // Refresh before announcing, or the message describes a list that is still
+      // a second behind it.
+      await load();
       setMessage(
         result.tracked
           ? `Now tracking "${page.title}": ${result.total} assumptions, ${result.broken} broken.`
           : `"${page.title}": ${result.note}`
       );
-      await load();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -223,11 +226,24 @@ const App = () => {
       setBulk({ done: i + 1, total: list.length });
     }
     setBulk(null);
+    await load();
     setMessage(
       `Now tracking ${tracked} ${tracked === 1 ? 'decision' : 'decisions'}` +
         (skipped ? `. ${skipped} had no assumptions Premise could read.` : '.')
     );
-    await load();
+  };
+
+  // The panel and the hourly check both change what this page shows, so give it a
+  // way to catch up without a browser reload.
+  const refresh = async () => {
+    setRefreshing(true);
+    setMessage(null);
+    setError(null);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (!data && !error) return <Text>Loading decisions...</Text>;
@@ -291,6 +307,15 @@ const App = () => {
         <Text>
           <Strong>{discovered.length}</Strong> untracked {discovered.length === 1 ? 'decision' : 'decisions'} found
         </Text>
+        <LoadingButton
+          appearance="subtle"
+          spacing="compact"
+          isLoading={refreshing}
+          isDisabled={busyId !== null || !!bulk}
+          onClick={refresh}
+        >
+          Refresh
+        </LoadingButton>
       </Inline>
 
       {/* Tracked decisions */}
@@ -322,7 +347,7 @@ const App = () => {
                   )}
                   <Text size="small">
                     {d.total} assumptions, {d.watched} watched
-                    {d.tickets.length > 0 ? `, revisit tickets: ${d.tickets.join(', ')}` : ''}
+                    {(d.tickets || []).length > 0 ? `, revisit tickets: ${d.tickets.join(', ')}` : ''}
                     {d.lastCheckedAt ? `, last checked ${new Date(d.lastCheckedAt).toLocaleString()}` : ''}
                   </Text>
                 </Stack>
