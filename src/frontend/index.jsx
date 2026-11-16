@@ -37,6 +37,15 @@ const STATUS = {
   error: { appearance: 'moved', label: 'Check failed' },
 };
 
+// A lozenge on its own row. Beside a long sentence in an Inline, UI Kit lets the
+// lozenge shrink until its label clips ("Hol..."), and there is no flex-shrink
+// control in UI Kit to stop it, so status tags never share a row with prose.
+const StatusTag = ({ appearance, label }) => (
+  <Inline>
+    <Lozenge appearance={appearance}>{label}</Lozenge>
+  </Inline>
+);
+
 // Make sure every assumption has a tripwire object to edit.
 const withTripwire = (a) => ({ ...a, tripwire: a.tripwire || { type: 'none' } });
 
@@ -95,24 +104,23 @@ const TripwireEditor = ({ tripwire, onChange }) => {
             </LoadingButton>
           </Inline>
           {preview && !preview.ok && (
-            <Inline space="space.100" alignBlock="center">
-              <Lozenge appearance="moved">Not run</Lozenge>
+            <Stack space="space.050">
+              <StatusTag appearance="moved" label="Not run" />
               <Text size="small">{preview.error}</Text>
-            </Inline>
+            </Stack>
           )}
           {preview?.ok && (
             <Stack space="space.050">
-              <Inline space="space.100" alignBlock="center">
-                <Lozenge appearance={preview.count > limit ? 'removed' : 'success'}>
-                  {preview.count > limit ? 'Trips now' : 'Holds'}
-                </Lozenge>
-                <Text size="small">
-                  {preview.count} issue{preview.count === 1 ? '' : 's'} match today.{' '}
-                  {preview.count > limit
-                    ? `Raise the limit above ${preview.count} unless you want this flagged immediately.`
-                    : `${limit - preview.count + 1} more would trip it.`}
-                </Text>
-              </Inline>
+              <StatusTag
+                appearance={preview.count > limit ? 'removed' : 'success'}
+                label={preview.count > limit ? 'Trips now' : 'Holds'}
+              />
+              <Text size="small">
+                {preview.count} issue{preview.count === 1 ? '' : 's'} match today.{' '}
+                {preview.count > limit
+                  ? `Raise the limit above ${preview.count} unless you want this flagged immediately.`
+                  : `${limit - preview.count + 1} more would trip it.`}
+              </Text>
               {preview.issues.map((i) => (
                 <Text key={i.key} size="small">
                   {i.key}: {i.summary}
@@ -289,8 +297,13 @@ const App = () => {
           ) : (
             draft.assumptions.map((a) => (
               <Stack key={a.id} space="space.075">
+                {/* A checkbox label does not wrap, so a long assumption pushed the whole
+                    panel sideways. The sentence goes in Text, which wraps. */}
+                <Text>
+                  <Strong>{a.text}</Strong>
+                </Text>
                 <Checkbox
-                  label={a.text}
+                  label="Watch this assumption"
                   isChecked={!!checked[a.id]}
                   onChange={() => setChecked({ ...checked, [a.id]: !checked[a.id] })}
                 />
@@ -337,10 +350,8 @@ const App = () => {
             const s = STATUS[a.status] || STATUS.unwatched;
             return (
               <Stack key={a.id} space="space.050">
-                <Inline space="space.100" alignBlock="center">
-                  <Lozenge appearance={s.appearance}>{s.label}</Lozenge>
-                  <Text>{a.text}</Text>
-                </Inline>
+                <StatusTag appearance={s.appearance} label={s.label} />
+                <Text>{a.text}</Text>
                 {a.evidence?.summary && <Text size="small">{a.evidence.summary}</Text>}
                 {(a.evidence?.issues || []).map((i) => (
                   <Inline key={i.key} space="space.100" alignBlock="center">
