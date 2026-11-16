@@ -96,7 +96,7 @@ const TripwireEditor = ({ tripwire, onChange }) => {
           </Inline>
           {preview && !preview.ok && (
             <Inline space="space.100" alignBlock="center">
-              <Lozenge appearance="moved">Search not run</Lozenge>
+              <Lozenge appearance="moved">Not run</Lozenge>
               <Text size="small">{preview.error}</Text>
             </Inline>
           )}
@@ -104,7 +104,7 @@ const TripwireEditor = ({ tripwire, onChange }) => {
             <Stack space="space.050">
               <Inline space="space.100" alignBlock="center">
                 <Lozenge appearance={preview.count > limit ? 'removed' : 'success'}>
-                  {preview.count > limit ? 'Would trip now' : 'Would hold'}
+                  {preview.count > limit ? 'Trips now' : 'Holds'}
                 </Lozenge>
                 <Text size="small">
                   {preview.count} issue{preview.count === 1 ? '' : 's'} match today.{' '}
